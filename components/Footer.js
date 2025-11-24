@@ -1,5 +1,5 @@
+import { Facebook, Instagram, MapPin, Twitter } from "lucide-react"
 import Link from "next/link"
-import { Facebook, Instagram, Twitter, MapPin } from "lucide-react"
 
 export default function Footer() {
   return (
@@ -62,8 +62,16 @@ export default function Footer() {
             </div>
           </div>
         </div>
-        <div className="mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} SORSO-GO. All rights reserved.
+        <div className="mt-8 flex flex-col items-center space-y-4 md:flex-row md:justify-between md:space-y-0">
+          <div className="text-sm text-muted-foreground">
+            &copy; {new Date().getFullYear()} SORSO-GO. All rights reserved.
+          </div>
+          <Link 
+            href="/admin-login" 
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Admin Login
+          </Link>
         </div>
       </div>
     </footer>

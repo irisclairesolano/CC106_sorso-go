@@ -1,18 +1,19 @@
-import Hero from "@/components/Hero"
-import DestinationCard from "@/components/DestinationCard"
-import StoryCard from "@/components/StoryCard"
-import TravelTipCard from "@/components/TravelTipCard"
 import { getFeaturedDestinations } from "@/app/actions/destination-actions"
-import { getStories } from "@/app/actions/story-actions"
 import { getUpcomingFestivals } from "@/app/actions/festival-actions"
 import { getAboutInfo, getTravelTips } from "@/app/actions/general-actions"
+import { getStories } from "@/app/actions/story-actions"
+import DestinationCard from "@/components/DestinationCard"
+import Hero from "@/components/Hero"
+import StoryCard from "@/components/StoryCard"
+import TravelTipCard from "@/components/TravelTipCard"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { CalendarDays, MapPin, PenSquare, Mail, Info } from "lucide-react"
-import Link from "next/link"
+import { CalendarDays, Info, Mail, MapPin, PenSquare } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 
 export default async function Home() {
+  // Fetch all data in parallel
   const [featuredDestinations, allStories, upcomingFestivals, aboutInfo, travelTips] = await Promise.all([
     getFeaturedDestinations(),
     getStories(),
@@ -21,9 +22,10 @@ export default async function Home() {
     getTravelTips(),
   ])
 
-  // Filter only approved stories
-  const approvedStories = allStories.filter((story) => story.approved).slice(0, 6)
-  const festivals = upcomingFestivals.slice(0, 6)
+  // Process data on the server side
+  const approvedStories = allStories?.filter((story) => story?.approved).slice(0, 6) || []
+  const festivals = upcomingFestivals?.slice(0, 6) || []
+  const destinations = featuredDestinations || []
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -240,7 +242,7 @@ export default async function Home() {
 
       {/* Contact CTA */}
       <section className="py-20 bg-primary/5">
-        <div className="container mx-auto text-center max-w-2xl">
+        <div className="container mx-auto px-4 text-center max-w-2xl">
           <h2 className="text-3xl font-bold mb-6 text-primary">Have Questions?</h2>
           <p className="text-muted-foreground mb-8 text-lg">
             Get in touch with us for travel advice, recommendations, or to share your Sorsogon experience.

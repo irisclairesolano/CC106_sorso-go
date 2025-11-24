@@ -1,9 +1,9 @@
 "use server"
 
+import { supabase } from "@/lib/supabaseClient"
 import { createHmac, randomUUID } from "crypto"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
-import { supabase } from "@/lib/supabaseClient"
 
 // Get credentials from environment variables (required)
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
@@ -24,7 +24,7 @@ if (!ADMIN_SESSION_SECRET) {
 }
 
 // --- Helper: Create JWT-like session ---
-function signAdminSession(payload) {
+export async function signAdminSession(payload) {
   const header = { alg: "HS256", typ: "JWT" }
   const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url")
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url")
@@ -36,61 +36,142 @@ function signAdminSession(payload) {
 }
 
 // --- Helper: Verify session token ---
-function verifyAdminSession(token) {
-  if (!token) return null
-  const [encodedHeader, encodedPayload, signature] = token.split(".")
-  if (!encodedHeader || !encodedPayload || !signature) return null
-
-  const expectedSignature = createHmac("sha256", ADMIN_SESSION_SECRET)
-    .update(`${encodedHeader}.${encodedPayload}`)
-    .digest("base64url")
-
-  if (expectedSignature !== signature) return null
-
+export async function verifyAdminSession(token) {
   try {
-    return JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"))
-  } catch {
-    return null
+    if (!token || typeof token !== 'string') {
+      return null;
+    }
+    
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    const [encodedHeader, encodedPayload, signature] = parts;
+    
+    if (!encodedHeader || !encodedPayload || !signature) {
+      return null;
+    }
+
+    const expectedSignature = createHmac("sha256", ADMIN_SESSION_SECRET)
+      .update(`${encodedHeader}.${encodedPayload}`)
+      .digest("base64url");
+
+    if (expectedSignature !== signature) {
+      return null;
+    }
+
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+    
+    // Ensure required fields exist
+    if (!payload.issuedAt || !payload.sessionId) {
+      return null;
+    }
+
+    return payload;
+  } catch (error) {
+    console.error("Error verifying session token:", error);
+    return null;
   }
 }
 
 // --- Server action: Verify login ---
 export async function verifyAdmin(email, password) {
-  if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-    const sessionToken = signAdminSession({
-      email,
-      issuedAt: Date.now(),
-      sessionId: randomUUID(),
-    })
+  try {
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+      // Generate values once to prevent hydration mismatches
+      const issuedAt = Date.now();
+      const sessionId = randomUUID();
+      
+      const sessionToken = await signAdminSession({
+        email,
+        issuedAt,
+        sessionId,
+      });
 
-    const cookieStore = await cookies()
-    await cookieStore.set({
-      name: "admin_session",
-      value: sessionToken,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24, // 24 hours
-    })
+      const cookieStore = await cookies();
+      await cookieStore.set({
+        name: "admin_session",
+        value: sessionToken,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24, // 24 hours
+      });
 
-    revalidatePath("/admin")
-    return { success: true }
+      revalidatePath("/admin");
+      return { 
+        success: true,
+        session: { issuedAt, sessionId } // Return session info for debugging
+      };
+    }
+
+    return { 
+      success: false, 
+      error: "Invalid credentials" 
+    };
+  } catch (error) {
+    console.error("Error in verifyAdmin:", error);
+    return { 
+      success: false, 
+      error: error.message || "An error occurred during login" 
+    };
   }
-
-  return { success: false, error: "Invalid credentials" }
 }
 
-// --- Check if admin is logged in ---
+// --- Check if admin is logged in (read-only) ---
 export async function isAdmin() {
-  const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get("admin_session")
-  const session = sessionCookie?.value
+  try {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get("admin_session")?.value;
+    
+    // Check if sessionToken exists and is a string
+    if (!sessionToken || typeof sessionToken !== 'string') {
+      return false;
+    }
 
-  if (!session) return false
+    // Verify the session token (read-only operation)
+    const session = await verifyAdminSession(sessionToken);
+    if (!session) {
+      return false;
+    }
 
-  const payload = verifyAdminSession(session)
-  return payload?.email === ADMIN_EMAIL
+    // Check if session is not expired (24 hours)
+    const sessionAge = Date.now() - session.issuedAt;
+    return sessionAge <= 24 * 60 * 60 * 1000;
+  } catch (error) {
+    console.error("Error verifying admin session:", error);
+    return false;
+  }
+}
+
+// --- Server action to validate and clean session ---
+export async function validateAdminSession() {
+  'use server';
+  
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("admin_session")?.value;
+  
+  if (!sessionToken || typeof sessionToken !== 'string') {
+    await cookieStore.delete("admin_session");
+    return { isValid: false };
+  }
+
+  const session = await verifyAdminSession(sessionToken);
+  if (!session) {
+    await cookieStore.delete("admin_session");
+    return { isValid: false };
+  }
+
+  // Check if session is not expired (24 hours)
+  const sessionAge = Date.now() - session.issuedAt;
+  if (sessionAge > 24 * 60 * 60 * 1000) {
+    await cookieStore.delete("admin_session");
+    return { isValid: false };
+  }
+
+  return { isValid: true, session };
 }
 
 // --- Logout admin ---
