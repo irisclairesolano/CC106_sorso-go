@@ -29,10 +29,12 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Hero />
+      <section id="hero">
+        <Hero />
+      </section>
 
       {/* Featured Destinations */}
-      <section className="py-20 bg-background">
+      <section id="destinations" className="py-20 bg-background">
         <div className="container mx-auto">
           <div className="flex justify-between items-end mb-10">
             <div>
@@ -62,7 +64,7 @@ export default async function Home() {
 
       {/* Travel Stories */}
       {approvedStories.length > 0 && (
-        <section className="py-20 bg-secondary/30">
+        <section id="stories" className="py-20 bg-secondary/30">
           <div className="container mx-auto">
             <div className="flex justify-between items-end mb-10">
               <div>
@@ -105,7 +107,7 @@ export default async function Home() {
 
       {/* Upcoming Festivals */}
       {festivals.length > 0 && (
-        <section className="py-20 bg-background">
+        <section id="festivals" className="py-20 bg-background">
           <div className="container mx-auto">
             <div className="flex justify-between items-end mb-10">
               <div>
@@ -203,9 +205,9 @@ export default async function Home() {
         </section>
       )}
 
-      {/* About Section Preview */}
+      {/* About Section */}
       {aboutInfo && (
-        <section className="py-20 bg-secondary/30">
+        <section id="about" className="py-20 bg-secondary/30">
           <div className="container mx-auto">
             <div className="flex justify-between items-end mb-10">
               <div>
@@ -240,8 +242,8 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Contact CTA */}
-      <section className="py-20 bg-primary/5">
+      {/* Call to Action */}
+      <section id="contact" className="py-20 bg-background">
         <div className="container mx-auto px-4 text-center max-w-2xl">
           <h2 className="text-3xl font-bold mb-6 text-primary">Have Questions?</h2>
           <p className="text-muted-foreground mb-8 text-lg">
