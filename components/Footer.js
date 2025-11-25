@@ -62,16 +62,16 @@ export default function Footer() {
             </div>
           </div>
         </div>
-        <div className="mt-8 flex flex-col items-center space-y-4 md:flex-row md:justify-between md:space-y-0">
-          <div className="text-sm text-muted-foreground">
+        <div className="mt-8 flex flex-col items-center space-y-4">
+          <div className="text-sm text-muted-foreground text-center">
             &copy; {new Date().getFullYear()} SORSO-GO. All rights reserved.
           </div>
-          <Link 
+          {/* <Link 
             href="/admin-login" 
             className="text-sm font-medium text-primary hover:underline"
           >
             Admin Login
-          </Link>
+          </Link> */}
         </div>
       </div>
     </footer>
