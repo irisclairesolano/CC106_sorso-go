@@ -1,7 +1,14 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import {
+  createDestination,
+  deleteDestination,
+  getDestinations,
+  updateDestination,
+} from "@/app/actions/destination-actions"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -11,19 +18,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Card, CardContent } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Plus, Edit2, Trash2 } from "lucide-react"
-import {
-  getDestinations,
-  createDestination,
-  updateDestination,
-  deleteDestination,
-} from "@/app/actions/destination-actions"
+import { Edit2, Eye, Loader2, Plus, Trash2, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useEffect, useState, useTransition } from "react"
 
 const STATUS_OPTIONS = [
   { label: "Draft", value: "draft" },
@@ -32,12 +33,119 @@ const STATUS_OPTIONS = [
 ]
 
 export default function AdminDestinationsTab() {
+  const router = useRouter()
   const [destinations, setDestinations] = useState([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
   const { toast } = useToast()
+  
+  // Image states
+  const [coverPreview, setCoverPreview] = useState('')
+  const [articleImagePreviews, setArticleImagePreviews] = useState([])
+  const [articleImageFiles, setArticleImageFiles] = useState([])
+  const [imagesToDelete, setImagesToDelete] = useState([])
+  
+  // Handle cover image change
+  const handleCoverChange = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setCoverPreview(URL.createObjectURL(file))
+    if (file) {
+      setCoverPreview(URL.createObjectURL(file))
+    }
+  }
+  
+  // Handle article images change
+  const handleArticleImagesChange = (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    
+    // Calculate remaining slots
+    const remainingSlots = 10 - articleImagePreviews.length
+    if (remainingSlots <= 0) {
+      toast({
+        title: "Maximum images reached",
+        description: "You can upload a maximum of 10 images per destination.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Only take as many files as we have slots for
+    const filesToAdd = files.slice(0, remainingSlots)
+    
+    // Create unique file names to prevent duplicates
+    const uniqueFiles = filesToAdd.filter(newFile => {
+      const isDuplicate = articleImageFiles.some(
+        existingFile => existingFile.name === newFile.name && 
+                        existingFile.size === newFile.size
+      )
+      return !isDuplicate
+    })
+
+    const newPreviews = uniqueFiles.map(file => ({
+      url: URL.createObjectURL(file),
+      file,
+      isNew: true,
+      id: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    }))
+    
+    setArticleImagePreviews(prev => [...prev, ...newPreviews])
+    setArticleImageFiles(prev => [...prev, ...uniqueFiles])
+    
+    // Clear the input to allow selecting the same file again if needed
+    e.target.value = ''
+  }
+  
+  // Handle removing an article image
+  const handleRemoveArticleImage = (index) => {
+    setArticleImagePreviews(prev => {
+      const newPreviews = [...prev]
+      const removed = newPreviews.splice(index, 1)[0]
+      
+      // If it's an existing image, mark it for deletion
+      if (!removed.isNew) {
+        setImagesToDelete(prev => [...(prev || []), removed.url])
+      }
+      
+      return newPreviews
+    })
+    
+    // Only remove from files if it was a new file
+    setArticleImageFiles(prev => {
+      if (index >= prev.length) return prev // Skip if it's an existing image
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+  
+  // Remove article image
+  const removeArticleImage = (index) => {
+    const newPreviews = [...articleImagePreviews]
+    newPreviews.splice(index, 1)
+    setArticleImagePreviews(newPreviews)
+  }
+  
+  // Reset form when opening/closing
+  const handleDialogOpenChange = (open) => {
+    setOpen(open)
+    if (!open) {
+      resetForm()
+    } else if (editing) {
+      setCoverPreview(editing.cover_image_url || '')
+      setArticleImagePreviews(editing.article_images || [])
+    }
+  }
+
+  const resetForm = () => {
+    setEditing(null)
+    setCoverPreview('')
+    setArticleImagePreviews([])
+    setArticleImageFiles([])
+    setImagesToDelete([])
+    document.getElementById('destination-form').reset()
+  }
 
   useEffect(() => {
     loadDestinations()
@@ -50,51 +158,67 @@ export default function AdminDestinationsTab() {
     setIsLoading(false)
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    const form = event.currentTarget
-    const formData = new FormData(form)
-    const action = editing ? updateDestination.bind(null, editing.id) : createDestination
-
-    startTransition(async () => {
-      try {
-        console.log("Submitting destination:", { editing: editing?.id, editingData: editing })
-        const result = await action(formData)
-        console.log("Destination action result:", result)
-        
-        if (!result) {
-          throw new Error("No result returned from server action")
-        }
-
-        if (result.success) {
-          toast({
-            title: editing ? "Destination Updated" : "Destination Created",
-            description: editing
-              ? "The destination has been updated successfully."
-              : "The destination has been added successfully.",
-          })
-          form.reset()
-          setEditing(null)
-          setOpen(false)
-          loadDestinations()
-        } else {
-          const errorMessage = result.error || "Something went wrong while saving the destination."
-          console.error("Destination save error:", errorMessage, result)
-          toast({
-            title: "Error",
-            description: errorMessage,
-            variant: "destructive",
-          })
-        }
-      } catch (error) {
-        console.error("Destination submit error:", error)
-        toast({
-          title: "Error",
-          description: error.message || "An unexpected error occurred. Please check the console for details.",
-          variant: "destructive",
-        })
+    const formData = new FormData(event.target)
+    
+    // Add cover preview if it's a new file
+    const coverFile = document.getElementById('cover_image')?.files[0]
+    if (coverFile) {
+      formData.delete('cover_image') // Remove any existing entry
+      formData.append('cover_image', coverFile)
+    } else if (coverPreview && coverPreview.startsWith('http')) {
+      // If it's an existing image URL, add it as existing_cover_image
+      formData.append('existing_cover_image', coverPreview)
+    }
+    
+    // Add new article images (only new ones)
+    articleImageFiles.forEach(file => {
+      if (file) { // Ensure file exists
+        formData.append('article_images', file)
       }
     })
+    
+    // Add existing article images that weren't removed
+    const existingImages = articleImagePreviews
+      .filter(img => !img.isNew && img.url)
+      .map(img => img.url)
+    
+    if (existingImages.length > 0) {
+      formData.append('existing_article_images', JSON.stringify(existingImages))
+    }
+    
+    // Add images to be deleted
+    if (imagesToDelete.length > 0) {
+      formData.append('images_to_delete', JSON.stringify(imagesToDelete))
+    }
+    
+    try {
+      if (editing) {
+        await updateDestination(editing.id, formData)
+        toast({
+          title: 'Destination updated',
+          description: 'The destination has been updated successfully.',
+        })
+      } else {
+        await createDestination(formData)
+        toast({
+          title: 'Destination created',
+          description: 'The destination has been created successfully.',
+        })
+      }
+      
+      setOpen(false)
+      resetForm()
+      loadDestinations()
+    } catch (error) {
+      console.error('Error saving destination:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save destination',
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleDelete = (id) => {
@@ -144,7 +268,7 @@ export default function AdminDestinationsTab() {
             <h3 className="text-xl font-semibold">Destinations</h3>
             <p className="text-sm text-muted-foreground">Manage tourist destinations and featured spots.</p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={handleDialogOpenChange}>
             <DialogTrigger asChild>
               <Button onClick={startCreate}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -161,7 +285,7 @@ export default function AdminDestinationsTab() {
                 </DialogDescription>
               </DialogHeader>
 
-              <form className="space-y-4" onSubmit={handleSubmit}>
+              <form id="destination-form" className="space-y-4" onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Title</Label>
@@ -226,18 +350,86 @@ export default function AdminDestinationsTab() {
                   </select>
                 </div>
 
+                {/* Cover Image Upload */}
                 <div className="space-y-2">
-                  <Label htmlFor="images">Images</Label>
-                  <Input id="images" name="images" type="file" multiple accept="image/*" />
-                  <p className="text-xs text-muted-foreground">You can upload multiple images; the first becomes the cover.</p>
+                  <Label>Cover Image</Label>
+                  <Input
+                    type="file"
+                    name="cover_image"
+                    accept="image/*"
+                    onChange={handleCoverChange}
+                  />
+                  {(coverPreview || editing?.cover_image_url) && (
+                    <div className="mt-2 relative w-40 h-40 border rounded-md overflow-hidden">
+                      <img
+                        src={coverPreview || editing?.cover_image_url}
+                        alt="Cover preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <input
+                    type="hidden"
+                    name="existing_cover_image"
+                    value={editing?.cover_image_url || ""}
+                  />
                 </div>
 
-                <input
-                  type="hidden"
-                  name="existing_gallery"
-                  value={JSON.stringify(editing?.image_gallery || [])}
-                />
-                <input type="hidden" name="image_url" value={editing?.image_url || ""} />
+                {/* Article Images Upload */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Article Images (Max 10)</Label>
+                    <span className="text-sm text-muted-foreground">
+                      {articleImagePreviews.length}/10 images
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label
+                      className={`flex items-center justify-center px-4 py-2 border border-dashed rounded-md cursor-pointer hover:bg-accent/50 transition-colors ${
+                        articleImagePreviews.length >= 10 ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {articleImagePreviews.length >= 10 ? "Maximum 10 images" : "Add Images"}
+                      <Input
+                        id="article_images"
+                        name="article_images"
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleArticleImagesChange}
+                        disabled={articleImagePreviews.length >= 10}
+                      />
+                    </label>
+                  </div>
+                  {articleImagePreviews.length > 0 && (
+                    <div className="mt-4 grid grid-cols-3 gap-4">
+                      {articleImagePreviews.map((preview, index) => (
+                        <div key={preview.id || index} className="relative group">
+                          <div className="aspect-square overflow-hidden rounded-lg border bg-muted">
+                            <img
+                              src={preview.url}
+                              alt={`Preview ${index + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              handleRemoveArticleImage(index)
+                            }}
+                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Remove image"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex justify-end gap-3">
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -280,11 +472,28 @@ export default function AdminDestinationsTab() {
                     <TableCell>{destination.category}</TableCell>
                     <TableCell>{destination.address}</TableCell>
                     <TableCell>
-                      <Badge variant={destination.status === "published" ? "default" : "secondary"}>
+                      <Badge 
+                        variant={destination.status === "published" ? "default" : "secondary"}
+                        className={`${
+                          destination.status === 'published' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' 
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                        }`}
+                      >
                         {destination.status || "draft"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{(destination.image_gallery || []).length || 0}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {destination.cover_image_url && (
+                          <div 
+                            className="w-6 h-6 rounded-full bg-cover bg-center border" 
+                            style={{ backgroundImage: `url(${destination.cover_image_url})` }} 
+                          />
+                        )}
+                        <span>{destination.article_images?.length || 0} images</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button size="sm" variant="outline" onClick={() => startEdit(destination)}>
                         <Edit2 className="h-4 w-4" />
@@ -296,6 +505,13 @@ export default function AdminDestinationsTab() {
                         onClick={() => handleDelete(destination.id)}
                       >
                         <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.push(`/destinations/${destination.id}`)}
+                      >
+                        <Eye className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
