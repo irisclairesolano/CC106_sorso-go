@@ -13,7 +13,17 @@ export default function Navigation({ showAdminButton = true }) {
   const [isOpen, setIsOpen] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
   const isHomePage = pathname === "/"
-  const activeSection = useActiveSection()
+  
+  // Only observe sections that exist on the current page
+  const sections = ["hero", "destinations", "stories", "festivals", "about", "contact"]
+    .filter(section => {
+      if (typeof document !== 'undefined') {
+        return !!document.getElementById(section)
+      }
+      return false
+    })
+  
+  const activeSection = useActiveSection(sections)
   const [isScrolled, setIsScrolled] = useState(false)
 
   // Handle scroll progress and navbar background

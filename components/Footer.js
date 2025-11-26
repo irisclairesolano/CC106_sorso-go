@@ -66,12 +66,12 @@ export default function Footer() {
           <div className="text-sm text-muted-foreground text-center">
             &copy; {new Date().getFullYear()} SORSO-GO. All rights reserved.
           </div>
-          {/* <Link 
+          <Link 
             href="/admin-login" 
             className="text-sm font-medium text-primary hover:underline"
           >
             Admin Login
-          </Link> */}
+          </Link>
         </div>
       </div>
     </footer>
