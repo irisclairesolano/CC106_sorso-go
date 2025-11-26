@@ -4,14 +4,23 @@ import { uploadFilesToStorage } from "@/lib/storage"
 import { supabase } from "@/lib/supabaseClient"
 import { revalidatePath } from "next/cache"
 
-export async function getDestinations() {
-  const { data, error } = await supabase.from("tourist_destination").select("*").order("id", { ascending: true })
+export async function getDestinations(includeAll = false) {
+  let query = supabase.from("tourist_destination").select("*")
+  
+  // If not including all, filter for only approved or published destinations
+  if (!includeAll) {
+    query = query.in('status', ['approved', 'published'])
+  }
+  
+  query = query.order("id", { ascending: true })
+  
+  const { data, error } = await query
 
   if (error) {
     console.error("Error fetching destinations:", error)
     return []
   }
-  return data
+  return data || []
 }
 
 export async function getDestinationById(id) {
@@ -47,14 +56,60 @@ export async function getDestinationById(id) {
 }
 
 export async function getFeaturedDestinations() {
-  const { data, error } = await supabase
-    .from("tourist_destination")
-    .select("*")
-    .order("id", { ascending: true })
-    .limit(3)
+  try {
+    if (!supabase) {
+      console.error("Supabase client is not initialized");
+      return [];
+    }
 
-  if (error) return []
-  return data
+    // Try a simple query to check if the table exists
+    const { data, error } = await supabase
+      .from("tourist_destination")
+      .select('*')
+      .limit(1);
+
+    if (error) {
+      if (error.code === '42P01') { // Table doesn't exist
+        console.log("The 'tourist_destination' table does not exist in your database.");
+        return [];
+      }
+      console.error("Error querying tourist_destination table:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      return [];
+    }
+
+    // If we get here, the table exists, so let's get the actual data
+    const { data: destinations, error: fetchError } = await supabase
+      .from("tourist_destination")
+      .select("*")
+      .in('status', ['approved', 'published'])
+      .order("created_at", { ascending: false })
+      .limit(6);
+
+    if (fetchError) {
+      console.error("Error fetching featured destinations:", {
+        message: fetchError.message,
+        details: fetchError.details,
+        hint: fetchError.hint,
+        code: fetchError.code
+      });
+      return [];
+    }
+
+    return destinations || [];
+
+  } catch (error) {
+    console.error("Unexpected error in getFeaturedDestinations:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    return [];
+  }
 }
 
 export async function createDestination(formData) {
@@ -138,25 +193,67 @@ export async function updateDestination(id, formData) {
       status: formData.get("status"),
     }
 
-    // Handle cover image
+    // ===== Cover Image Handling =====
     const coverImage = formData.get("cover_image")
-    if (coverImage instanceof File) {
+
+    if (coverImage instanceof File && coverImage.size > 0) {
+      // New cover uploaded
       const [uploadedCover] = await uploadFilesToStorage([coverImage], "uploads/destinations/covers")
       if (uploadedCover) {
         payload.cover_image_url = uploadedCover
       }
     } else if (formData.get("existing_cover_image")) {
+      // Keep existing cover image as-is
       payload.cover_image_url = formData.get("existing_cover_image")
+    } else {
+      // User removed the cover image
+      payload.cover_image_url = null
     }
 
-    // Handle article images
-    const articleImages = formData.getAll("article_images").filter(file => file instanceof File)
-    let uploadedArticleImages = []
-    if (articleImages.length > 0) {
-      uploadedArticleImages = await uploadFilesToStorage(articleImages, "uploads/destinations/articles")
+    // ===== Gallery Images Handling =====
+    const imagesToDelete = JSON.parse(formData.get("images_to_delete") || "[]")
+
+    // New image files selected by the user
+    const newGalleryFiles = Array.from(formData.getAll("article_images")).filter(
+      (file) => file instanceof File && file.size > 0,
+    )
+
+    let uploadedGalleryImages = []
+    if (newGalleryFiles.length > 0) {
+      uploadedGalleryImages = await uploadFilesToStorage(newGalleryFiles, "uploads/destinations/articles")
     }
-    const existingArticleImages = JSON.parse(formData.get("existing_article_images") || "[]")
-    payload.article_images = [...existingArticleImages, ...uploadedArticleImages]
+
+    // Existing gallery URLs that the user kept (not in imagesToDelete)
+    const existingGallery = JSON.parse(formData.get("existing_article_images") || "[]")
+      .filter((url) => !imagesToDelete.includes(url))
+
+    // Merge existing + newly uploaded
+    payload.article_images = [...existingGallery, ...uploadedGalleryImages]
+
+    // ===== Optional storage cleanup of deleted images =====
+    if (imagesToDelete.length > 0) {
+      try {
+        const paths = imagesToDelete.map((fullUrl) => {
+          try {
+            const { pathname } = new URL(fullUrl)
+            // pathname like /storage/v1/object/public/<bucket>/<key>
+            // Extract everything after the bucket name
+            const parts = pathname.split("/object/public/")
+            return parts.length === 2 ? parts[1] : null
+          } catch {
+            return null
+          }
+        }).filter(Boolean)
+
+        if (paths.length > 0) {
+          // NOTE: replace 'uploads' with your actual bucket name if different
+          await supabase.storage.from("uploads").remove(paths)
+        }
+      } catch (cleanupErr) {
+        console.error("Image cleanup error:", cleanupErr)
+        // Do not fail request if cleanup fails
+      }
+    }
 
     // Clean up payload (remove undefined/null/empty values)
     Object.keys(payload).forEach(key => {

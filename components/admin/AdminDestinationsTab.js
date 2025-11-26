@@ -120,12 +120,6 @@ export default function AdminDestinationsTab() {
     })
   }
   
-  // Remove article image
-  const removeArticleImage = (index) => {
-    const newPreviews = [...articleImagePreviews]
-    newPreviews.splice(index, 1)
-    setArticleImagePreviews(newPreviews)
-  }
   
   // Reset form when opening/closing
   const handleDialogOpenChange = (open) => {
@@ -144,7 +138,12 @@ export default function AdminDestinationsTab() {
     setArticleImagePreviews([])
     setArticleImageFiles([])
     setImagesToDelete([])
-    document.getElementById('destination-form').reset()
+    
+    // Safely reset the form if it exists
+    const form = document.getElementById('destination-form')
+    if (form) {
+      form.reset()
+    }
   }
 
   useEffect(() => {
@@ -153,7 +152,8 @@ export default function AdminDestinationsTab() {
 
   const loadDestinations = async () => {
     setIsLoading(true)
-    const data = await getDestinations()
+    // Pass includeAll: true to get all destinations including non-published ones in admin
+    const data = await getDestinations(true)
     setDestinations(data || [])
     setIsLoading(false)
   }
@@ -168,9 +168,8 @@ export default function AdminDestinationsTab() {
       formData.delete('cover_image') // Remove any existing entry
       formData.append('cover_image', coverFile)
     } else if (coverPreview && coverPreview.startsWith('http')) {
-      // If it's an existing image URL, add it as existing_cover_image
       formData.append('existing_cover_image', coverPreview)
-    }
+    } // else: user removed cover, backend will set it to null
     
     // Add new article images (only new ones)
     articleImageFiles.forEach(file => {
@@ -179,14 +178,13 @@ export default function AdminDestinationsTab() {
       }
     })
     
-    // Add existing article images that weren't removed
+    // Determine existing gallery images that remain (not deleted)
     const existingImages = articleImagePreviews
       .filter(img => !img.isNew && img.url)
       .map(img => img.url)
-    
-    if (existingImages.length > 0) {
-      formData.append('existing_article_images', JSON.stringify(existingImages))
-    }
+
+    // Always send the remaining existing images (could be empty if all removed)
+    formData.append('existing_article_images', JSON.stringify(existingImages))
     
     // Add images to be deleted
     if (imagesToDelete.length > 0) {

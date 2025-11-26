@@ -12,6 +12,8 @@ export default function DestinationCard({ destination }) {
           src={destination.cover_image_url || destination.image_url || `/placeholder.svg?height=400&width=600&query=sorsogon+${destination.name}`}
           alt={destination.name}
           fill
+          placeholder="blur"
+          blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZGRkIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
           className="object-cover transition-transform duration-700 group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
