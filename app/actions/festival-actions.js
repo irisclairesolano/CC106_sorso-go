@@ -1,8 +1,8 @@
 "use server"
 
+import { uploadFilesToStorage } from "@/lib/storage"
 import { supabase } from "@/lib/supabaseClient"
 import { revalidatePath } from "next/cache"
-import { uploadFilesToStorage } from "@/lib/storage"
 
 /**
  * Get all festivals, ordered by start date
@@ -115,13 +115,50 @@ export async function updateFestival(id, formData) {
   const start_date = formData.get("start_date")
   const end_date = formData.get("end_date")
   const location = formData.get("location")
-  const existingGallery = JSON.parse(formData.get("existing_gallery") || "[]")
-  const images = formData.getAll("images").filter((file) => file instanceof File)
+
+  // Safely parse the existing gallery payload which may arrive as JSON or stringified JSON
+  const existingGalleryRaw = formData.get("existing_gallery") || "[]"
+  let existingGallery = []
+
+  try {
+    const parsed = JSON.parse(existingGalleryRaw)
+    if (Array.isArray(parsed)) {
+      existingGallery = parsed
+    } else if (typeof parsed === "string") {
+      const reParsed = JSON.parse(parsed)
+      if (Array.isArray(reParsed)) {
+        existingGallery = reParsed
+      }
+    }
+  } catch (error) {
+    console.warn("updateFestival: failed to parse existing_gallery", error)
+    existingGallery = []
+  }
+
+  const images = formData
+    .getAll("images")
+    .filter((file) => file instanceof File)
   const uploaded = images.length ? await uploadFilesToStorage(images, "uploads/festivals") : []
-  const image_gallery = [...existingGallery, ...uploaded]
+
+  // Place newly uploaded images first so the latest upload becomes the cover
+  let image_gallery = uploaded.length
+    ? [...uploaded, ...existingGallery]
+    : [...existingGallery]
+
+  // Remove falsy values and duplicates while preserving order
+  const seen = new Set()
+  image_gallery = image_gallery.filter((url) => {
+    if (!url || typeof url !== "string") return false
+    if (seen.has(url)) return false
+    seen.add(url)
+    return true
+  })
+
   const payload = { name, description, start_date, end_date, location, image_gallery }
 
-  if (image_gallery.length) {
+  if (uploaded.length > 0) {
+    payload.image_url = uploaded[0]
+  } else if (image_gallery.length > 0) {
     payload.image_url = image_gallery[0]
   } else if (formData.get("image_url")) {
     payload.image_url = formData.get("image_url")

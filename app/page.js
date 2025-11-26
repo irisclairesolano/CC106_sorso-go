@@ -1,16 +1,18 @@
-import { getFeaturedDestinations } from "@/app/actions/destination-actions"
-import { getUpcomingFestivals } from "@/app/actions/festival-actions"
-import { getAboutInfo, getTravelTips } from "@/app/actions/general-actions"
-import { getStories } from "@/app/actions/story-actions"
-import DestinationCard from "@/components/DestinationCard"
-import Hero from "@/components/Hero"
-import StoryCard from "@/components/StoryCard"
-import TravelTipCard from "@/components/TravelTipCard"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { CalendarDays, Info, Mail, MapPin, PenSquare } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
+export const revalidate = 60; // Revalidate every 60 seconds
+
+import { getFeaturedDestinations } from "@/app/actions/destination-actions";
+import { getUpcomingFestivals } from "@/app/actions/festival-actions";
+import { getAboutInfo, getTravelTips } from "@/app/actions/general-actions";
+import { getStories } from "@/app/actions/story-actions";
+import DestinationCard from "@/components/DestinationCard";
+import Hero from "@/components/Hero";
+import StoryCard from "@/components/StoryCard";
+import TravelTipCard from "@/components/TravelTipCard";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { CalendarDays, Info, Mail, MapPin, PenSquare } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 
 export default async function Home() {
   // Fetch all data in parallel
@@ -129,6 +131,8 @@ export default async function Home() {
                           src={festival.image_url}
                           alt={festival.name}
                           fill
+                          placeholder="blur"
+                          blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZGRkIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
                           className="object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                       </div>
@@ -143,12 +147,14 @@ export default async function Home() {
                           <CalendarDays className="h-4 w-4" />
                           <span>
                             {new Date(festival.start_date).toLocaleDateString("en-US", {
+                                        timeZone: "UTC",
                               month: "short",
                               day: "numeric",
                               year: "numeric",
                             })}
                             {festival.end_date &&
                               ` - ${new Date(festival.end_date).toLocaleDateString("en-US", {
+                                  timeZone: "UTC",
                                 month: "short",
                                 day: "numeric",
                               })}`}

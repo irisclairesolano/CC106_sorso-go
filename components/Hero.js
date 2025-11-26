@@ -6,9 +6,12 @@ export default function Hero() {
   return (
     <section className="relative overflow-hidden w-full min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat" 
              style={{ 
-               backgroundImage: 'url(/hero_photo.webp)',
+               backgroundImage: 'url(/hero_img.jpg)',
                filter: 'saturate(1.1) contrast(1.1)',
-               WebkitFilter: 'saturate(1.1) contrast(1.1)'
+               WebkitFilter: 'saturate(1.1) contrast(1.1)',
+               backgroundSize: 'cover',
+               backgroundPosition: 'center',
+               backgroundRepeat: 'no-repeat'
              }}>
       <div className="absolute inset-0 bg-gradient-to-b from-palm-green/10 to-deep-sea/20 mix-blend-overlay" />
       <div className="absolute inset-0 bg-gradient-to-r from-deep-sea/10 via-transparent to-deep-sea/10 mix-blend-overlay" />

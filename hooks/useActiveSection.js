@@ -1,14 +1,17 @@
 "use client"
 
+import throttle from "lodash.throttle"
 import { useCallback, useEffect, useState } from "react"
 
 export function useActiveSection(sections = []) {
   const [activeSection, setActiveSection] = useState("")
 
+  const throttledSet = useCallback(throttle((id)=>setActiveSection(id),100),[])
+
   const handleIntersection = useCallback((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting && entry.intersectionRatio > 0.1) {
-        setActiveSection(entry.target.id)
+        throttledSet(entry.target.id)
       }
     })
   }, [])
