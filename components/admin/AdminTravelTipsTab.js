@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { getTravelTips, createTravelTip, updateTravelTip, deleteTravelTip } from "@/app/actions/general-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -95,6 +95,11 @@ export default function AdminTravelTipsTab() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingTip ? "Edit Travel Tip" : "Create New Travel Tip"}</DialogTitle>
+              <DialogDescription>
+                {editingTip 
+                  ? "Update the travel tip details below."
+                  : "Add helpful travel advice for visitors to Sorsogon."}
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">

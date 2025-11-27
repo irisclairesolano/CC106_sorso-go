@@ -1,6 +1,6 @@
 "use server"
 
-import { uploadFilesToStorage } from "@/lib/storage"
+import { uploadFilesToStorage, deleteFilesFromStorage } from "@/lib/storage"
 import { supabase } from "@/lib/supabaseClient"
 import { revalidatePath } from "next/cache"
 
@@ -48,7 +48,10 @@ export async function getStoryById(id) {
     .eq("id", id)
     .single()
 
-  if (error) return null
+  if (error) {
+    console.error("Error fetching story:", error)
+    return null
+  }
 
   return {
     ...data,
@@ -83,72 +86,179 @@ export async function getStoriesByDestination(destinationId) {
   }))
 }
 
+/**
+ * Helper function to sync story tags
+ * Creates new tags if they don't exist, then links them to the story
+ */
+async function syncStoryTags(storyId, tagNames) {
+  if (!storyId || !tagNames || tagNames.length === 0) {
+    // Remove all existing tags if no new tags provided
+    await supabase.from("story_tag").delete().eq("story_id", storyId)
+    return { success: true }
+  }
+
+  try {
+    // First, remove all existing story_tag entries for this story
+    await supabase.from("story_tag").delete().eq("story_id", storyId)
+
+    // Get or create tags
+    const tagIds = []
+    for (const tagName of tagNames) {
+      const normalizedName = tagName.trim().toLowerCase()
+      if (!normalizedName) continue
+
+      // Check if tag exists
+      let { data: existingTag } = await supabase
+        .from("tag")
+        .select("id")
+        .eq("name", normalizedName)
+        .single()
+
+      if (existingTag) {
+        tagIds.push(existingTag.id)
+      } else {
+        // Create new tag
+        const { data: newTag, error: createError } = await supabase
+          .from("tag")
+          .insert({ name: normalizedName })
+          .select("id")
+          .single()
+
+        if (newTag && !createError) {
+          tagIds.push(newTag.id)
+        }
+      }
+    }
+
+    // Create story_tag relationships
+    if (tagIds.length > 0) {
+      const storyTagEntries = tagIds.map(tagId => ({
+        story_id: storyId,
+        tag_id: tagId
+      }))
+
+      await supabase.from("story_tag").insert(storyTagEntries)
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error syncing story tags:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Helper function to reconcile gallery images
+ * Merges existing images with new ones, removing deleted ones
+ */
+function reconcileGalleryImages(existingGallery, newGallery, deletedImages) {
+  // Parse inputs
+  const existing = parseJsonSafe(existingGallery, [])
+  const newImages = parseJsonSafe(newGallery, [])
+  const deleted = parseJsonSafe(deletedImages, [])
+
+  // Start with existing images, filter out deleted ones
+  let result = existing.filter(url => !deleted.includes(url))
+
+  // Add new images
+  result = [...result, ...newImages]
+
+  // Remove duplicates
+  result = [...new Set(result)]
+
+  return result
+}
+
+function parseJsonSafe(value, defaultValue = []) {
+  if (!value) return defaultValue
+  if (Array.isArray(value)) return value
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : defaultValue
+  } catch {
+    return defaultValue
+  }
+}
+
 export async function createStory(formData) {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
-
     // Extract form data
     const title = formData.get('title')
     const content = formData.get('content')
     const author_name = formData.get('author_name') || null
-    const status = formData.get('status') || 'draft'
     
-    // Handle destination_id - ensure it's a valid integer or null
+    // Handle destination_id
     let destination_id = formData.get('destination_id')
     destination_id = destination_id && !isNaN(parseInt(destination_id)) ? parseInt(destination_id) : null
 
-    // Handle cover image
-    const coverImageFile = formData.get('image_url')
-    let cover_image_url = null
-    
-    // Handle gallery images
-    const galleryImages = formData.getAll('image_gallery[]')
-    let article_images = []
-
-    // Upload cover image if it's a file
-    if (coverImageFile && coverImageFile.size > 0) {
-      const [uploadedCover] = await uploadFilesToStorage([coverImageFile], 'stories')
-      if (uploadedCover) cover_image_url = uploadedCover
-    } else if (typeof coverImageFile === 'string' && coverImageFile.startsWith('http')) {
-      // If it's already a URL, use it directly
-      cover_image_url = coverImageFile
-    }
-
-    // Upload gallery images
-    const galleryFiles = Array.isArray(galleryImages) 
-      ? galleryImages.filter(img => img && img.size > 0) 
-      : []
-    
-    if (galleryFiles.length > 0) {
-      article_images = await uploadFilesToStorage(galleryFiles, 'stories/gallery')
-    } else if (formData.get('existing_gallery')) {
-      // Handle existing gallery if no new files are uploaded
-      try {
-        const existingGallery = JSON.parse(formData.get('existing_gallery'))
-        if (Array.isArray(existingGallery)) {
-          article_images = existingGallery
-            .filter(img => img && (typeof img === 'string' || img.url))
-            .map(img => typeof img === 'string' ? img : img.url)
-        }
-      } catch (e) {
-        console.error('Error parsing existing gallery:', e)
+    // Handle tags - parse JSON array or comma-separated string
+    let tags = []
+    const tagsValue = formData.get('tags')
+    if (tagsValue) {
+      tags = parseJsonSafe(tagsValue, [])
+      if (tags.length === 0 && typeof tagsValue === 'string') {
+        // Try comma-separated parsing
+        tags = tagsValue.split(',').map(t => t.trim()).filter(Boolean)
       }
     }
 
-    // Create the story in the database
+    // Handle images - support both 'images' (public form) and 'image_url'/'gallery_images' (admin form)
+    let image_url = null
+    let image_gallery = []
+    
+    // Check for cover image from admin form
+    const coverImageValue = formData.get('image_url')
+    if (coverImageValue) {
+      if (typeof coverImageValue === 'string' && coverImageValue.startsWith('http')) {
+        image_url = coverImageValue
+      } else if (coverImageValue.size > 0) {
+        const [uploadedCover] = await uploadFilesToStorage([coverImageValue], 'stories')
+        if (uploadedCover) image_url = uploadedCover
+      }
+    }
+
+    // Handle images from public submission form (field name: 'images')
+    const publicImages = formData.getAll('images').filter(f => f && f.size > 0)
+    if (publicImages.length > 0) {
+      const uploadedPublicImages = await uploadFilesToStorage(publicImages, 'stories')
+      if (uploadedPublicImages.length > 0) {
+        // First image becomes cover, rest go to gallery
+        if (!image_url) {
+          image_url = uploadedPublicImages[0]
+          image_gallery = uploadedPublicImages.slice(1)
+        } else {
+          image_gallery = [...image_gallery, ...uploadedPublicImages]
+        }
+      }
+    }
+
+    // Handle gallery images from admin form
+    const existingGallery = parseJsonSafe(formData.get('existing_gallery'), [])
+    const newGallery = parseJsonSafe(formData.get('new_gallery'), [])
+    const galleryFiles = formData.getAll('gallery_images').filter(f => f && f.size > 0)
+    
+    if (galleryFiles.length > 0) {
+      const uploadedGalleryUrls = await uploadFilesToStorage(galleryFiles, 'stories/gallery')
+      image_gallery = [...image_gallery, ...uploadedGalleryUrls]
+    }
+
+    // Combine all gallery sources
+    image_gallery = [...existingGallery, ...newGallery, ...image_gallery]
+
+    // Determine if this is an admin submission (status = 'published' means auto-approve)
+    const status = formData.get('status')
+    const isAdminSubmission = status === 'published'
+    
     const { data, error } = await supabase
       .from('story')
       .insert([{
         title,
         content,
         author_name,
-        user_id: user.id,
         destination_id,
-        cover_image_url,
-        article_images: article_images.length > 0 ? article_images : null,
-        status,
-        approved: status === 'published' // Auto-approve if published
+        image_url,
+        image_gallery: image_gallery.length > 0 ? image_gallery : null,
+        approved: isAdminSubmission // Public submissions are NOT approved, admin can approve directly
       }])
       .select()
       .single()
@@ -158,7 +268,11 @@ export async function createStory(formData) {
       throw error
     }
 
-    // Revalidate relevant paths
+    // Sync tags
+    if (tags.length > 0) {
+      await syncStoryTags(data.id, tags)
+    }
+
     revalidatePath("/stories")
     revalidatePath("/admin")
     
@@ -166,8 +280,8 @@ export async function createStory(formData) {
       success: true, 
       data: {
         ...data,
-        image_url: cover_image_url,
-        image_gallery: article_images
+        tags,
+        image_gallery
       } 
     }
   } catch (error) {
@@ -181,102 +295,208 @@ export async function createStory(formData) {
 
 export async function updateStory(id, formData) {
   try {
-    console.log("Updating story with id:", id);
+    console.log("Updating story with id:", id)
     
     // Get existing story data
-    const { data: existingStory } = await supabase
+    const { data: existingStory, error: fetchError } = await supabase
       .from('story')
       .select('*')
       .eq('id', id)
-      .single();
+      .single()
 
-    if (!existingStory) {
-      throw new Error('Story not found');
+    if (fetchError || !existingStory) {
+      throw new Error('Story not found')
     }
 
+    // Build update payload
     const payload = {
       title: formData.get('title') || existingStory.title,
       content: formData.get('content') || existingStory.content,
       author_name: formData.get('author_name') || existingStory.author_name,
-      approved: formData.get('approved') === 'true' || existingStory.approved,
-    };
+    }
+
+    // Handle approved status
+    const status = formData.get('status')
+    if (status) {
+      payload.approved = status === 'published' || formData.get('approved') === 'true'
+    } else if (formData.get('approved') !== null) {
+      payload.approved = formData.get('approved') === 'true'
+    }
 
     // Handle destination_id
-    const destination_id = formData.get('destination_id');
-    if (destination_id) {
-      payload.destination_id = destination_id === 'none' ? null : parseInt(destination_id);
-    } else if (formData.has('destination_id')) {
-      payload.destination_id = null;
+    const destination_id = formData.get('destination_id')
+    if (destination_id !== null && destination_id !== undefined) {
+      payload.destination_id = destination_id === 'none' || destination_id === '' 
+        ? null 
+        : parseInt(destination_id)
     }
 
-    // Handle image uploads
-    const imageFiles = Array.from(formData.getAll('images')).filter(file => file.size > 0);
-    
-    if (imageFiles.length > 0) {
-      // Upload new images
-      const newImageUrls = await uploadFilesToStorage(imageFiles, 'stories');
-      
-      // Get existing images or initialize empty arrays
-      const existingImages = existingStory.image_gallery || [];
-      const existingCover = existingStory.image_url ? [existingStory.image_url] : [];
-      
-      // Combine images (new uploads + existing)
-      const allImages = [...existingCover, ...existingImages, ...newImageUrls];
-      
-      // First image is the cover, rest go to gallery
-      payload.image_url = allImages[0] || null;
-      payload.image_gallery = allImages.length > 1 ? allImages.slice(1) : [];
-    }
-
-    // Handle image deletions if needed
-    const imagesToDelete = formData.get('imagesToDelete');
-    if (imagesToDelete) {
-      const urlsToRemove = JSON.parse(imagesToDelete);
-      if (Array.isArray(urlsToRemove) && urlsToRemove.length > 0) {
-        // Remove from gallery
-        payload.image_gallery = (payload.image_gallery || existingStory.image_gallery || [])
-          .filter(url => !urlsToRemove.includes(url));
-        
-        // If cover is being removed, use the first gallery image as new cover
-        if (urlsToRemove.includes(payload.image_url)) {
-          payload.image_url = payload.image_gallery[0] || null;
-          payload.image_gallery = payload.image_gallery.slice(1);
-        }
+    // Handle cover image
+    const coverImageValue = formData.get('image_url')
+    if (coverImageValue !== null && coverImageValue !== undefined) {
+      if (typeof coverImageValue === 'string') {
+        payload.image_url = coverImageValue || null
+      } else if (coverImageValue.size > 0) {
+        const [uploadedCover] = await uploadFilesToStorage([coverImageValue], 'stories')
+        if (uploadedCover) payload.image_url = uploadedCover
       }
     }
 
-    console.log("Final update payload:", payload);
+    // ===== Gallery Images Handling =====
+    // Parse all gallery-related data
+    const existingGalleryRaw = formData.get('existing_gallery')
+    const newGalleryRaw = formData.get('new_gallery')
+    const deletedImagesRaw = formData.get('deleted_images')
+
+    // Determine if gallery data was explicitly sent
+    const hasGalleryData = existingGalleryRaw !== null || newGalleryRaw !== null || deletedImagesRaw !== null
+
+    const existingGallery = parseJsonSafe(existingGalleryRaw, [])
+    const newGallery = parseJsonSafe(newGalleryRaw, [])
+    const deletedImages = parseJsonSafe(deletedImagesRaw, [])
+
+    console.log("Gallery processing:", {
+      hasGalleryData,
+      existingGallery,
+      newGallery,
+      deletedImages,
+      existingFromDB: existingStory.image_gallery
+    })
+
+    // Upload any file-based gallery images
+    const galleryFiles = formData.getAll('gallery_images').filter(f => f && f.size > 0)
+    let uploadedGalleryUrls = []
+    
+    if (galleryFiles.length > 0) {
+      uploadedGalleryUrls = await uploadFilesToStorage(galleryFiles, 'stories/gallery')
+      console.log("Uploaded gallery files:", uploadedGalleryUrls)
+    }
+
+    // Only update gallery if gallery data was explicitly provided
+    if (hasGalleryData) {
+      // Start with existing images that the frontend is keeping (not deleted)
+      const keptExistingImages = existingGallery.filter(url => !deletedImages.includes(url))
+      
+      // Merge: kept existing + new URLs from media library + newly uploaded files
+      const allNewImages = [...newGallery, ...uploadedGalleryUrls]
+      const finalGallery = [...keptExistingImages, ...allNewImages]
+      
+      // Remove duplicates while preserving order
+      const uniqueGallery = [...new Set(finalGallery)]
+      
+      payload.image_gallery = uniqueGallery.length > 0 ? uniqueGallery : null
+      
+      console.log("Final gallery:", payload.image_gallery)
+    } else if (uploadedGalleryUrls.length > 0) {
+      // Fallback: Just add new file uploads to existing gallery (no frontend tracking)
+      payload.image_gallery = [
+        ...(existingStory.image_gallery || []),
+        ...uploadedGalleryUrls
+      ]
+    }
+    // else: no gallery changes, don't update image_gallery field
+
+    // Delete removed images from storage (optional cleanup)
+    if (deletedImages.length > 0) {
+      try {
+        await deleteFilesFromStorage(deletedImages)
+        console.log("Deleted images from storage:", deletedImages)
+      } catch (deleteErr) {
+        console.warn('Could not delete old images from storage:', deleteErr)
+      }
+    }
+
+    // Handle tags
+    const tagsValue = formData.get('tags')
+    let tags = []
+    if (tagsValue) {
+      tags = parseJsonSafe(tagsValue, [])
+      if (tags.length === 0 && typeof tagsValue === 'string') {
+        tags = tagsValue.split(',').map(t => t.trim()).filter(Boolean)
+      }
+    }
+
+    // Handle SEO fields if provided
+    const seoFields = ['seo_title', 'seo_description', 'seo_keywords', 'seo_image']
+    seoFields.forEach(field => {
+      const value = formData.get(field)
+      if (value !== null && value !== undefined) {
+        payload[field] = value || null
+      }
+    })
+
+    console.log("Final update payload:", payload)
+    
     const { data, error: updateError } = await supabase
       .from('story')
       .update(payload)
       .eq('id', id)
       .select()
-      .single();
+      .single()
 
     if (updateError) {
-      console.error('Update error:', updateError);
-      throw updateError;
+      console.error('Update error:', updateError)
+      throw updateError
     }
 
+    // Sync tags (always, even if empty to clear old tags)
+    await syncStoryTags(id, tags)
+
     // Revalidate relevant paths
-    revalidatePath('/stories');
-    revalidatePath(`/stories/${id}`);
-    revalidatePath('/admin/stories');
+    revalidatePath('/stories')
+    revalidatePath(`/stories/${id}`)
+    revalidatePath('/admin')
     
-    return { success: true, data }
+    return { 
+      success: true, 
+      data: {
+        ...data,
+        tags
+      }
+    }
   } catch (error) {
-    console.error("updateStory unexpected error:", error)
+    console.error("updateStory error:", error)
     return { success: false, error: error.message || "An unexpected error occurred" }
   }
 }
 
 export async function deleteStory(id) {
-  const { error } = await supabase.from("story").delete().eq("id", id)
+  try {
+    // First, get the story to find images to delete
+    const { data: story } = await supabase
+      .from("story")
+      .select("image_url, image_gallery")
+      .eq("id", id)
+      .single()
 
-  if (error) {
+    // Delete the story (this should cascade delete story_tag entries)
+    const { error } = await supabase.from("story").delete().eq("id", id)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    // Optionally clean up images from storage
+    if (story) {
+      const imagesToDelete = [
+        story.image_url,
+        ...(story.image_gallery || [])
+      ].filter(Boolean)
+
+      if (imagesToDelete.length > 0) {
+        try {
+          await deleteFilesFromStorage(imagesToDelete)
+        } catch (err) {
+          console.warn('Could not clean up story images:', err)
+        }
+      }
+    }
+
+    revalidatePath("/stories")
+    revalidatePath("/admin")
+    return { success: true }
+  } catch (error) {
+    console.error("deleteStory error:", error)
     return { success: false, error: error.message }
   }
-
-  revalidatePath("/stories")
-  return { success: true }
 }

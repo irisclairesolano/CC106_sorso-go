@@ -1,30 +1,32 @@
 "use client"
 
 import {
-  createDestination,
-  deleteDestination,
-  getDestinations,
-  updateDestination,
+    createDestination,
+    deleteDestination,
+    getDestinations,
+    updateDestination,
 } from "@/app/actions/destination-actions"
+import { FormActions, FormField, FormProvider } from "@/components/shared/FormProvider"
+import { MediaLibrary } from "@/components/shared/MediaLibrary"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { Edit2, Eye, Loader2, Plus, Trash2, X } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useEffect, useState, useTransition } from "react"
+import { Edit2, Eye, ImageIcon, Loader2, Plus, Trash2, X } from "lucide-react"
+import Link from "next/link"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
 
 const STATUS_OPTIONS = [
   { label: "Draft", value: "draft" },
@@ -32,231 +34,238 @@ const STATUS_OPTIONS = [
   { label: "Hidden", value: "hidden" },
 ]
 
+const DEFAULT_VALUES = {
+  name: "",
+  category: "",
+  address: "",
+  coordinates: "",
+  description: "",
+  article_content: "",
+  status: "draft",
+  image_url: "",
+  gallery_images: [],
+  deleted_images: [],
+}
+
 export default function AdminDestinationsTab() {
-  const router = useRouter()
   const [destinations, setDestinations] = useState([])
-  const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isPending, startTransition] = useTransition()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false)
+  const [galleryLibraryOpen, setGalleryLibraryOpen] = useState(false)
+  const [coverImage, setCoverImage] = useState("")
+  const [galleryImages, setGalleryImages] = useState([])
+  const [deletedGallery, setDeletedGallery] = useState([])
+  const [editing, setEditing] = useState(null)
   const { toast } = useToast()
-  
-  // Image states
-  const [coverPreview, setCoverPreview] = useState('')
-  const [articleImagePreviews, setArticleImagePreviews] = useState([])
-  const [articleImageFiles, setArticleImageFiles] = useState([])
-  const [imagesToDelete, setImagesToDelete] = useState([])
-  
-  // Handle cover image change
-  const handleCoverChange = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    setCoverPreview(URL.createObjectURL(file))
-    if (file) {
-      setCoverPreview(URL.createObjectURL(file))
-    }
-  }
-  
-  // Handle article images change
-  const handleArticleImagesChange = (e) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length === 0) return
-    
-    // Calculate remaining slots
-    const remainingSlots = 10 - articleImagePreviews.length
-    if (remainingSlots <= 0) {
-      toast({
-        title: "Maximum images reached",
-        description: "You can upload a maximum of 10 images per destination.",
-        variant: "destructive",
-      })
-      return
-    }
 
-    // Only take as many files as we have slots for
-    const filesToAdd = files.slice(0, remainingSlots)
-    
-    // Create unique file names to prevent duplicates
-    const uniqueFiles = filesToAdd.filter(newFile => {
-      const isDuplicate = articleImageFiles.some(
-        existingFile => existingFile.name === newFile.name && 
-                        existingFile.size === newFile.size
-      )
-      return !isDuplicate
-    })
+  const methods = useForm({ defaultValues: DEFAULT_VALUES })
+  const { reset, watch, setValue, formState: { isSubmitting } } = methods
+  const formValues = watch()
 
-    const newPreviews = uniqueFiles.map(file => ({
-      url: URL.createObjectURL(file),
-      file,
-      isNew: true,
-      id: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    }))
-    
-    setArticleImagePreviews(prev => [...prev, ...newPreviews])
-    setArticleImageFiles(prev => [...prev, ...uniqueFiles])
-    
-    // Clear the input to allow selecting the same file again if needed
-    e.target.value = ''
-  }
-  
-  // Handle removing an article image
-  const handleRemoveArticleImage = (index) => {
-    setArticleImagePreviews(prev => {
-      const newPreviews = [...prev]
-      const removed = newPreviews.splice(index, 1)[0]
-      
-      // If it's an existing image, mark it for deletion
-      if (!removed.isNew) {
-        setImagesToDelete(prev => [...(prev || []), removed.url])
-      }
-      
-      return newPreviews
-    })
-    
-    // Only remove from files if it was a new file
-    setArticleImageFiles(prev => {
-      if (index >= prev.length) return prev // Skip if it's an existing image
-      return prev.filter((_, i) => i !== index)
-    })
-  }
-  
-  
-  // Reset form when opening/closing
-  const handleDialogOpenChange = (open) => {
-    setOpen(open)
-    if (!open) {
-      resetForm()
-    } else if (editing) {
-      setCoverPreview(editing.cover_image_url || '')
-      setArticleImagePreviews(editing.article_images || [])
-    }
-  }
+  const destinationsMemo = useMemo(() => destinations, [destinations])
 
-  const resetForm = () => {
-    setEditing(null)
-    setCoverPreview('')
-    setArticleImagePreviews([])
-    setArticleImageFiles([])
-    setImagesToDelete([])
-    
-    // Safely reset the form if it exists
-    const form = document.getElementById('destination-form')
-    if (form) {
-      form.reset()
-    }
-  }
-
-  useEffect(() => {
-    loadDestinations()
-  }, [])
-
-  const loadDestinations = async () => {
+  const loadDestinations = useCallback(async () => {
     setIsLoading(true)
-    // Pass includeAll: true to get all destinations including non-published ones in admin
     const data = await getDestinations(true)
     setDestinations(data || [])
     setIsLoading(false)
-  }
+  }, [])
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    const formData = new FormData(event.target)
-    
-    // Add cover preview if it's a new file
-    const coverFile = document.getElementById('cover_image')?.files[0]
-    if (coverFile) {
-      formData.delete('cover_image') // Remove any existing entry
-      formData.append('cover_image', coverFile)
-    } else if (coverPreview && coverPreview.startsWith('http')) {
-      formData.append('existing_cover_image', coverPreview)
-    } // else: user removed cover, backend will set it to null
-    
-    // Add new article images (only new ones)
-    articleImageFiles.forEach(file => {
-      if (file) { // Ensure file exists
-        formData.append('article_images', file)
-      }
-    })
-    
-    // Determine existing gallery images that remain (not deleted)
-    const existingImages = articleImagePreviews
-      .filter(img => !img.isNew && img.url)
-      .map(img => img.url)
+  useEffect(() => {
+    loadDestinations()
+  }, [loadDestinations])
 
-    // Always send the remaining existing images (could be empty if all removed)
-    formData.append('existing_article_images', JSON.stringify(existingImages))
-    
-    // Add images to be deleted
-    if (imagesToDelete.length > 0) {
-      formData.append('images_to_delete', JSON.stringify(imagesToDelete))
-    }
-    
-    try {
-      if (editing) {
-        await updateDestination(editing.id, formData)
-        toast({
-          title: 'Destination updated',
-          description: 'The destination has been updated successfully.',
-        })
-      } else {
-        await createDestination(formData)
-        toast({
-          title: 'Destination created',
-          description: 'The destination has been created successfully.',
-        })
-      }
-      
-      setOpen(false)
-      resetForm()
-      loadDestinations()
-    } catch (error) {
-      console.error('Error saving destination:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to save destination',
-        variant: 'destructive',
-      })
-    }
-  }
+  useEffect(() => {
+    methods.register("gallery_images")
+    methods.register("image_url")
+    methods.register("deleted_images")
+  }, [methods])
 
-  const handleDelete = (id) => {
-    if (!confirm("Are you sure you want to delete this destination?")) return
-    startTransition(async () => {
-      const result = await deleteDestination(id)
-      if (result.success) {
-        toast({ title: "Destination deleted" })
-        loadDestinations()
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to delete destination.",
-          variant: "destructive",
-        })
-      }
-    })
-  }
+  useEffect(() => {
+    setValue("gallery_images", galleryImages.map((img) => img.url), { shouldValidate: false })
+  }, [galleryImages, setValue])
 
-  const startCreate = () => {
+  useEffect(() => {
+    setValue("image_url", coverImage || "", { shouldValidate: false })
+  }, [coverImage, setValue])
+
+  useEffect(() => {
+    setValue("deleted_images", deletedGallery, { shouldValidate: false })
+  }, [deletedGallery, setValue])
+
+  const resetFormState = useCallback(() => {
     setEditing(null)
-    setOpen(true)
-  }
+    setCoverImage("")
+    setGalleryImages([])
+    setDeletedGallery([])
+    reset(DEFAULT_VALUES)
+  }, [reset])
 
-  const startEdit = (record) => {
-    console.log("Starting edit with record:", record)
-    if (!record || (!record.id && !record.destination_id)) {
-      console.error("Invalid record for editing:", record)
+  const handleDialogChange = useCallback((open) => {
+    setDialogOpen(open)
+    if (!open) {
+      resetFormState()
+    }
+  }, [resetFormState])
+
+  const openCoverLibrary = useCallback(() => {
+    setMediaLibraryOpen(true)
+  }, [])
+
+  const openGalleryLibrary = useCallback(() => {
+    setGalleryLibraryOpen(true)
+  }, [])
+
+  const handleCoverSelect = useCallback((selected) => {
+    if (!selected) {
+      setMediaLibraryOpen(false)
+      return
+    }
+    const imageUrl = Array.isArray(selected) ? selected[0] : selected
+    const finalUrl = typeof imageUrl === "string" ? imageUrl : imageUrl?.url
+    if (finalUrl) {
+      setCoverImage(finalUrl)
+    }
+    setMediaLibraryOpen(false)
+  }, [])
+
+  const handleGallerySelect = useCallback((selected) => {
+    if (!selected) {
+      setGalleryLibraryOpen(false)
+      return
+    }
+    const selections = Array.isArray(selected) ? selected : [selected]
+    const normalized = selections
+      .map((item, index) => ({
+        url: typeof item === "string" ? item : item?.url,
+        isNew: true,
+        id: `new-${Date.now()}-${index}`,
+      }))
+      .filter((item) => item.url)
+
+    setGalleryImages((prev) => [...prev, ...normalized])
+    setGalleryLibraryOpen(false)
+  }, [])
+
+  const removeGalleryImage = useCallback((index) => {
+    setGalleryImages((prev) => {
+      const copy = [...prev]
+      const [removed] = copy.splice(index, 1)
+      if (removed && !removed.isNew && removed.url) {
+        setDeletedGallery((existing) => (existing.includes(removed.url) ? existing : [...existing, removed.url]))
+      }
+      return copy
+    })
+  }, [])
+
+  const removeCoverImage = useCallback(() => {
+    setCoverImage("")
+  }, [])
+
+  const handleCreate = useCallback(() => {
+    resetFormState()
+    setDialogOpen(true)
+  }, [resetFormState])
+
+  const handleEdit = useCallback((record) => {
+    if (!record?.id) {
       toast({
         title: "Error",
-        description: "Invalid destination data. Please refresh the page.",
+        description: "Invalid destination data. Please refresh and try again.",
         variant: "destructive",
       })
       return
     }
-    // Ensure we use 'id' field (fallback to destination_id for backwards compatibility)
-    const recordWithId = { ...record, id: record.id || record.destination_id }
-    setEditing(recordWithId)
-    setOpen(true)
-  }
+
+    const cover = record.cover_image_url || record.image_url || ""
+    const existingGallery = (record.article_images || []).map((url, idx) => ({
+      url,
+      isNew: false,
+      id: `existing-${idx}`,
+    }))
+
+    reset({
+      ...DEFAULT_VALUES,
+      name: record.name || "",
+      category: record.category || "",
+      address: record.address || "",
+      coordinates: record.coordinates || "",
+      description: record.description || "",
+      article_content: record.article_content || "",
+      status: record.status || "draft",
+      image_url: cover,
+      gallery_images: existingGallery.map((img) => img.url),
+    })
+
+    setEditing(record)
+    setCoverImage(cover)
+    setGalleryImages(existingGallery)
+    setDeletedGallery([])
+    setDialogOpen(true)
+  }, [reset, toast])
+
+  const handleDelete = useCallback(async (id) => {
+    if (!confirm("Are you sure you want to delete this destination?")) return
+    const result = await deleteDestination(id)
+    if (result.success) {
+      toast({
+        title: "Destination deleted",
+      })
+      loadDestinations()
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to delete destination.",
+        variant: "destructive",
+      })
+    }
+  }, [loadDestinations, toast])
+
+  const onSubmit = useCallback(async (data) => {
+    try {
+      const formData = new FormData()
+      const fields = ["name", "category", "address", "coordinates", "description", "article_content", "status"]
+
+      fields.forEach((field) => {
+        if (data[field]) {
+          formData.append(field, data[field])
+        }
+      })
+
+      formData.set("image_url", coverImage || "")
+      formData.set("gallery_images", JSON.stringify(galleryImages.map((img) => img.url)))
+
+      if (deletedGallery.length > 0) {
+        formData.set("deleted_images", JSON.stringify(deletedGallery))
+      }
+
+      const result = editing
+        ? await updateDestination(editing.id, formData)
+        : await createDestination(formData)
+
+      if (!result || !result.success) {
+        throw new Error(result?.error || "Failed to save destination")
+      }
+
+      toast({
+        title: editing ? "Destination updated" : "Destination created",
+        description: editing
+          ? "The destination has been updated successfully."
+          : "The destination has been created successfully.",
+      })
+
+      handleDialogChange(false)
+      loadDestinations()
+    } catch (error) {
+      console.error("Error saving destination:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save destination",
+        variant: "destructive",
+      })
+    }
+  }, [coverImage, deletedGallery, editing, galleryImages, handleDialogChange, loadDestinations, toast])
 
   return (
     <Card>
@@ -266,179 +275,188 @@ export default function AdminDestinationsTab() {
             <h3 className="text-xl font-semibold">Destinations</h3>
             <p className="text-sm text-muted-foreground">Manage tourist destinations and featured spots.</p>
           </div>
-          <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+          <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
             <DialogTrigger asChild>
-              <Button onClick={startCreate}>
+              <Button onClick={handleCreate}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Destination
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent
+              className="max-w-3xl max-h-[90vh] overflow-y-auto"
+              onPointerDownOutside={(event) => {
+                if (mediaLibraryOpen || galleryLibraryOpen) {
+                  event.preventDefault()
+                }
+              }}
+              onInteractOutside={(event) => {
+                if (mediaLibraryOpen || galleryLibraryOpen) {
+                  event.preventDefault()
+                }
+              }}
+              onEscapeKeyDown={(event) => {
+                if (mediaLibraryOpen || galleryLibraryOpen) {
+                  event.preventDefault()
+                }
+              }}
+            >
               <DialogHeader>
-                <DialogTitle>{editing ? "Edit Destination" : "Add Destination"}</DialogTitle>
+                <DialogTitle>{editing ? "Edit Destination" : "Create Destination"}</DialogTitle>
                 <DialogDescription>
                   {editing
-                    ? "Update the details of this destination."
-                    : "Provide information about the new destination."}
+                    ? "Update the destination details and media."
+                    : "Fill in the details to add a new destination."}
                 </DialogDescription>
               </DialogHeader>
 
-              <form id="destination-form" className="space-y-4" onSubmit={handleSubmit}>
+              <FormProvider methods={methods} onSubmit={methods.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Title</Label>
-                    <Input id="name" name="name" defaultValue={editing?.name || ""} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Input id="category" name="category" defaultValue={editing?.category || ""} required />
-                  </div>
+                  <FormField name="name" label="Title" required>
+                    <Input placeholder="Destination name" autoComplete="off" />
+                  </FormField>
+                  <FormField name="category" label="Category" required>
+                    <Input placeholder="e.g. Beach, Mountain, Historical" autoComplete="off" />
+                  </FormField>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Input id="address" name="address" defaultValue={editing?.address || ""} />
+                  <FormField name="address" label="Address">
+                    <Input placeholder="Enter destination address" autoComplete="off" />
+                  </FormField>
+                  <FormField name="coordinates" label="Coordinates">
+                    <Input placeholder="e.g. 12.9747, 124.0312" autoComplete="off" />
+                  </FormField>
+                </div>
+
+                <FormField name="description" label="Short Description" required>
+                  <Textarea rows={3} placeholder="Brief summary shown on listing cards" />
+                </FormField>
+
+                <FormField name="article_content" label="Detailed Content">
+                  <Textarea rows={6} placeholder="Full article content (supports HTML)" />
+                </FormField>
+
+                <FormField
+                  name="status"
+                  label="Status"
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      className="w-full rounded-md border bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      {STATUS_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Cover Image</label>
+                    <div className="flex gap-2">
+                      {coverImage && (
+                        <Button type="button" variant="outline" size="sm" onClick={removeCoverImage}>
+                          Remove
+                        </Button>
+                      )}
+                      <Button type="button" variant="outline" size="sm" onClick={openCoverLibrary}>
+                        <ImageIcon className="mr-2 h-4 w-4" />
+                        {coverImage ? "Change Cover" : "Select Cover"}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="coordinates">Coordinates</Label>
-                    <Input
-                      id="coordinates"
-                      name="coordinates"
-                      placeholder="e.g. 12.9747, 124.0312"
-                      defaultValue={editing?.coordinates || ""}
-                    />
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Short Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    rows={3}
-                    defaultValue={editing?.description || ""}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="article_content">Full Article Content</Label>
-                  <Textarea
-                    id="article_content"
-                    name="article_content"
-                    rows={5}
-                    defaultValue={editing?.article_content || ""}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <select
-                    id="status"
-                    name="status"
-                    className="w-full rounded-md border bg-background px-3 py-2"
-                    defaultValue={editing?.status || "draft"}
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Cover Image Upload */}
-                <div className="space-y-2">
-                  <Label>Cover Image</Label>
-                  <Input
-                    type="file"
-                    name="cover_image"
-                    accept="image/*"
-                    onChange={handleCoverChange}
-                  />
-                  {(coverPreview || editing?.cover_image_url) && (
-                    <div className="mt-2 relative w-40 h-40 border rounded-md overflow-hidden">
-                      <img
-                        src={coverPreview || editing?.cover_image_url}
-                        alt="Cover preview"
-                        className="w-full h-full object-cover"
-                      />
+                  {coverImage ? (
+                    <div className="relative aspect-video rounded-lg overflow-hidden border bg-muted">
+                      <img src={coverImage} alt="Cover image preview" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div
+                      className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={openCoverLibrary}
+                    >
+                      <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">Click to select a cover image</p>
                     </div>
                   )}
-                  <input
-                    type="hidden"
-                    name="existing_cover_image"
-                    value={editing?.cover_image_url || ""}
-                  />
                 </div>
 
-                {/* Article Images Upload */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label>Article Images (Max 10)</Label>
-                    <span className="text-sm text-muted-foreground">
-                      {articleImagePreviews.length}/10 images
-                    </span>
+                    <div>
+                      <label className="text-sm font-medium">Gallery Images</label>
+                      <p className="text-xs text-muted-foreground">Use the media library to add or remove gallery images.</p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={openGalleryLibrary}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Images
+                    </Button>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label
-                      className={`flex items-center justify-center px-4 py-2 border border-dashed rounded-md cursor-pointer hover:bg-accent/50 transition-colors ${
-                        articleImagePreviews.length >= 10 ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      {articleImagePreviews.length >= 10 ? "Maximum 10 images" : "Add Images"}
-                      <Input
-                        id="article_images"
-                        name="article_images"
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleArticleImagesChange}
-                        disabled={articleImagePreviews.length >= 10}
-                      />
-                    </label>
-                  </div>
-                  {articleImagePreviews.length > 0 && (
-                    <div className="mt-4 grid grid-cols-3 gap-4">
-                      {articleImagePreviews.map((preview, index) => (
-                        <div key={preview.id || index} className="relative group">
-                          <div className="aspect-square overflow-hidden rounded-lg border bg-muted">
-                            <img
-                              src={preview.url}
-                              alt={`Preview ${index + 1}`}
-                              className="h-full w-full object-cover"
-                            />
+
+                  {galleryImages.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {galleryImages.map((image, index) => (
+                        <div key={image.id || `${image.url}-${index}`} className="relative group">
+                          <div className="aspect-square rounded-md overflow-hidden border bg-muted">
+                            <img src={image.url} alt={`Gallery image ${index + 1}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => removeGalleryImage(index)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            {image.isNew && (
+                              <Badge className="absolute top-2 left-2 text-[10px] px-2 py-0.5">New</Badge>
+                            )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              handleRemoveArticleImage(index)
-                            }}
-                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                            aria-label="Remove image"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
                         </div>
                       ))}
                     </div>
+                  ) : (
+                    <div
+                      className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={openGalleryLibrary}
+                    >
+                      <ImageIcon className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">Click to add gallery images</p>
+                    </div>
                   )}
                 </div>
 
-                <div className="flex justify-end gap-3">
-                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                <FormActions className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => handleDialogChange(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isPending}>
-                    {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {editing ? "Save Changes" : "Create Destination"}
                   </Button>
-                </div>
-              </form>
+                </FormActions>
+              </FormProvider>
+
+              <MediaLibrary
+                isOpen={mediaLibraryOpen}
+                onClose={() => setMediaLibraryOpen(false)}
+                onSelect={handleCoverSelect}
+                currentSelection={coverImage ? [coverImage] : []}
+                multiple={false}
+              />
+
+              <MediaLibrary
+                isOpen={galleryLibraryOpen}
+                onClose={() => setGalleryLibraryOpen(false)}
+                onSelect={handleGallerySelect}
+                currentSelection={galleryImages.map((img) => img.url)}
+                multiple
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -448,7 +466,7 @@ export default function AdminDestinationsTab() {
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading destinations...
           </div>
-        ) : destinations.length === 0 ? (
+        ) : destinationsMemo.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground">No destinations found.</div>
         ) : (
           <div className="overflow-x-auto">
@@ -464,36 +482,38 @@ export default function AdminDestinationsTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {destinations.map((destination) => (
+                {destinationsMemo.map((destination) => (
                   <TableRow key={destination.id}>
-                    <TableCell className="font-medium">{destination.name}</TableCell>
+                    <TableCell className="font-medium max-w-[200px]">
+                      <div className="flex items-center gap-3">
+                        {destination.cover_image_url && (
+                          <div
+                            className="w-10 h-10 rounded bg-cover bg-center flex-shrink-0 border"
+                            style={{ backgroundImage: `url(${destination.cover_image_url})` }}
+                          />
+                        )}
+                        <span className="truncate">{destination.name}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>{destination.category}</TableCell>
-                    <TableCell>{destination.address}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{destination.address || "—"}</TableCell>
                     <TableCell>
-                      <Badge 
+                      <Badge
                         variant={destination.status === "published" ? "default" : "secondary"}
-                        className={`${
-                          destination.status === 'published' 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' 
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                        }`}
+                        className={destination.status === "published"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"}
                       >
                         {destination.status || "draft"}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        {destination.cover_image_url && (
-                          <div 
-                            className="w-6 h-6 rounded-full bg-cover bg-center border" 
-                            style={{ backgroundImage: `url(${destination.cover_image_url})` }} 
-                          />
-                        )}
-                        <span>{destination.article_images?.length || 0} images</span>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        {(destination.article_images?.length || 0) + (destination.cover_image_url ? 1 : 0)} photos
                       </div>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button size="sm" variant="outline" onClick={() => startEdit(destination)}>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(destination)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
@@ -504,13 +524,11 @@ export default function AdminDestinationsTab() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => router.push(`/destinations/${destination.id}`)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <Link href={`/destinations/${destination.id}`} target="_blank">
+                        <Button size="sm" variant="outline">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -87,7 +87,14 @@ export async function createFestival(formData) {
   const start_date = formData.get("start_date")
   const end_date = formData.get("end_date")
   const location = formData.get("location")
-  const images = formData.getAll("images").filter((file) => file instanceof File)
+  
+  // Filter valid file uploads - check for size > 0 since empty file inputs still create File objects
+  const images = formData.getAll("images").filter((file) => {
+    return file && typeof file === 'object' && file.size > 0
+  })
+  
+  console.log("Festival create - files to upload:", images.length)
+  
   const image_gallery = images.length ? await uploadFilesToStorage(images, "uploads/festivals") : []
   const image_url = image_gallery[0] || formData.get("image_url")
 
@@ -118,7 +125,9 @@ export async function updateFestival(id, formData) {
 
   // Safely parse the existing gallery payload which may arrive as JSON or stringified JSON
   const existingGalleryRaw = formData.get("existing_gallery") || "[]"
+  const deletedGalleryRaw = formData.get("deleted_gallery") || "[]"
   let existingGallery = []
+  let deletedGallery = []
 
   try {
     const parsed = JSON.parse(existingGalleryRaw)
@@ -135,15 +144,34 @@ export async function updateFestival(id, formData) {
     existingGallery = []
   }
 
-  const images = formData
-    .getAll("images")
-    .filter((file) => file instanceof File)
+  try {
+    const parsedDeleted = JSON.parse(deletedGalleryRaw)
+    if (Array.isArray(parsedDeleted)) {
+      deletedGallery = parsedDeleted
+    }
+  } catch (error) {
+    console.warn("updateFestival: failed to parse deleted_gallery", error)
+    deletedGallery = []
+  }
+
+  // Filter valid file uploads - check for size > 0 since empty file inputs still create File objects
+  const images = formData.getAll("images").filter((file) => {
+    return file && typeof file === 'object' && file.size > 0
+  })
+  
+  console.log("Festival update - files to upload:", images.length)
+  
   const uploaded = images.length ? await uploadFilesToStorage(images, "uploads/festivals") : []
 
   // Place newly uploaded images first so the latest upload becomes the cover
   let image_gallery = uploaded.length
     ? [...uploaded, ...existingGallery]
     : [...existingGallery]
+
+  if (deletedGallery.length > 0) {
+    const deletedSet = new Set(deletedGallery)
+    image_gallery = image_gallery.filter((url) => !deletedSet.has(url))
+  }
 
   // Remove falsy values and duplicates while preserving order
   const seen = new Set()

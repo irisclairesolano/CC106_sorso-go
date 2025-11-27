@@ -122,34 +122,74 @@ export async function createDestination(formData) {
     const coordinates = formData.get("coordinates") || ""
     const status = formData.get("status") || "draft"
     
-    // Handle cover image
-    const coverImage = formData.get("cover_image")
-    let coverImageUrl = formData.get("existing_cover_image") || ""
-    if (coverImage && coverImage.size > 0) {
-      const [uploadedCover] = await uploadFilesToStorage([coverImage], "uploads/destinations/covers")
-      if (uploadedCover) {
-        coverImageUrl = uploadedCover
+    // Handle cover image (new: media library URL, fallback to legacy upload)
+    const coverImageFromLibrary = formData.get("image_url")
+    let coverImageUrl = typeof coverImageFromLibrary === "string" ? coverImageFromLibrary.trim() : ""
+
+    if (!coverImageUrl) {
+      const coverImageFile = formData.get("cover_image")
+      const existingCover = formData.get("existing_cover_image")
+      if (coverImageFile && typeof coverImageFile === "object" && coverImageFile.size > 0) {
+        const [uploadedCover] = await uploadFilesToStorage([coverImageFile], "uploads/destinations/covers")
+        if (uploadedCover) {
+          coverImageUrl = uploadedCover
+        }
+      } else if (typeof existingCover === "string" && existingCover.trim()) {
+        coverImageUrl = existingCover.trim()
       }
     }
 
-    // Handle article images
-    const articleImages = Array.from(formData.getAll("article_images")).filter(
-      file => file instanceof File && file.size > 0
-    )
-    
-    let uploadedArticleImages = []
-    if (articleImages.length > 0) {
-      uploadedArticleImages = await uploadFilesToStorage(articleImages, "uploads/destinations/articles")
+    // Handle article images (new: media library URLs, fallback to legacy upload)
+    const galleryImagesJson = formData.get("gallery_images")
+    let galleryImages = []
+
+    if (typeof galleryImagesJson === "string" && galleryImagesJson.trim()) {
+      try {
+        const parsed = JSON.parse(galleryImagesJson)
+        if (Array.isArray(parsed)) {
+          galleryImages = parsed.filter((url) => typeof url === "string" && url.trim())
+        }
+      } catch (error) {
+        console.warn("Failed to parse gallery_images JSON:", error)
+      }
     }
-    
-    // Get existing article images from the form data
-    const existingArticleImagesJson = formData.get("existing_article_images")
-    const existingArticleImages = existingArticleImagesJson 
-      ? JSON.parse(existingArticleImagesJson)
-      : []
-      
-    // Combine existing and newly uploaded images
-    const allArticleImages = [...existingArticleImages, ...uploadedArticleImages]
+
+    if (galleryImages.length === 0) {
+      const articleImages = Array.from(formData.getAll("article_images")).filter(
+        (file) => file && typeof file === "object" && file.size > 0,
+      )
+
+      let uploadedArticleImages = []
+      if (articleImages.length > 0) {
+        uploadedArticleImages = await uploadFilesToStorage(articleImages, "uploads/destinations/articles")
+      }
+
+      let existingArticleImages = []
+      const existingArticleImagesJson = formData.get("existing_article_images")
+      if (typeof existingArticleImagesJson === "string" && existingArticleImagesJson.trim()) {
+        try {
+          const parsed = JSON.parse(existingArticleImagesJson)
+          if (Array.isArray(parsed)) {
+            existingArticleImages = parsed.filter((url) => typeof url === "string" && url.trim())
+          }
+        } catch (error) {
+          console.warn("Failed to parse existing_article_images JSON:", error)
+        }
+      }
+
+      galleryImages = [...existingArticleImages, ...uploadedArticleImages]
+    }
+
+    // Remove duplicates while preserving order
+    const uniqueGalleryImages = []
+    const seenGallery = new Set()
+    for (const url of galleryImages) {
+      const trimmed = typeof url === "string" ? url.trim() : ""
+      if (trimmed && !seenGallery.has(trimmed)) {
+        seenGallery.add(trimmed)
+        uniqueGalleryImages.push(trimmed)
+      }
+    }
 
     const { data, error } = await supabase
       .from("tourist_destination")
@@ -161,8 +201,8 @@ export async function createDestination(formData) {
         address,
         coordinates,
         status,
-        cover_image_url: coverImageUrl,
-        article_images: allArticleImages
+        cover_image_url: coverImageUrl || null,
+        article_images: uniqueGalleryImages
       }])
       .select()
       .single()
@@ -183,52 +223,122 @@ export async function createDestination(formData) {
 
 export async function updateDestination(id, formData) {
   try {
+    console.log("updateDestination called with id:", id)
+    
+    // Get existing destination data first
+    const { data: existingDestination, error: fetchError } = await supabase
+      .from("tourist_destination")
+      .select("*")
+      .eq("id", id)
+      .single()
+
+    if (fetchError || !existingDestination) {
+      console.error("Failed to fetch existing destination:", fetchError)
+      return { success: false, error: "Destination not found" }
+    }
+
     const payload = {
-      name: formData.get("name"),
-      category: formData.get("category"),
-      description: formData.get("description"),
-      article_content: formData.get("article_content"),
-      address: formData.get("address"),
-      coordinates: formData.get("coordinates"),
-      status: formData.get("status"),
+      name: formData.get("name") || existingDestination.name,
+      category: formData.get("category") || existingDestination.category,
+      description: formData.get("description") || existingDestination.description,
+      article_content: formData.get("article_content") ?? existingDestination.article_content,
+      address: formData.get("address") ?? existingDestination.address,
+      coordinates: formData.get("coordinates") ?? existingDestination.coordinates,
+      status: formData.get("status") || existingDestination.status,
     }
 
     // ===== Cover Image Handling =====
-    const coverImage = formData.get("cover_image")
+    const coverImageFromLibrary = formData.get("image_url")
+    const existingCoverImage = formData.get("existing_cover_image")
+    const coverImageFile = formData.get("cover_image")
 
-    if (coverImage instanceof File && coverImage.size > 0) {
-      // New cover uploaded
-      const [uploadedCover] = await uploadFilesToStorage([coverImage], "uploads/destinations/covers")
+    if (typeof coverImageFromLibrary === "string" && coverImageFromLibrary.trim()) {
+      payload.cover_image_url = coverImageFromLibrary.trim()
+    } else if (coverImageFile && typeof coverImageFile === 'object' && coverImageFile.size > 0) {
+      // Legacy: uploaded file
+      const [uploadedCover] = await uploadFilesToStorage([coverImageFile], "uploads/destinations/covers")
       if (uploadedCover) {
         payload.cover_image_url = uploadedCover
       }
-    } else if (formData.get("existing_cover_image")) {
-      // Keep existing cover image as-is
-      payload.cover_image_url = formData.get("existing_cover_image")
+    } else if (typeof existingCoverImage === "string" && existingCoverImage.trim()) {
+      payload.cover_image_url = existingCoverImage.trim()
     } else {
-      // User removed the cover image
       payload.cover_image_url = null
     }
 
     // ===== Gallery Images Handling =====
-    const imagesToDelete = JSON.parse(formData.get("images_to_delete") || "[]")
+    const galleryImagesJson = formData.get("gallery_images")
+    let galleryFromForm = []
 
-    // New image files selected by the user
-    const newGalleryFiles = Array.from(formData.getAll("article_images")).filter(
-      (file) => file instanceof File && file.size > 0,
-    )
-
-    let uploadedGalleryImages = []
-    if (newGalleryFiles.length > 0) {
-      uploadedGalleryImages = await uploadFilesToStorage(newGalleryFiles, "uploads/destinations/articles")
+    if (typeof galleryImagesJson === "string" && galleryImagesJson.trim()) {
+      try {
+        const parsed = JSON.parse(galleryImagesJson)
+        if (Array.isArray(parsed)) {
+          galleryFromForm = parsed.filter((url) => typeof url === "string" && url.trim())
+        }
+      } catch (error) {
+        console.warn("Failed to parse gallery_images JSON in updateDestination:", error)
+      }
     }
 
-    // Existing gallery URLs that the user kept (not in imagesToDelete)
-    const existingGallery = JSON.parse(formData.get("existing_article_images") || "[]")
-      .filter((url) => !imagesToDelete.includes(url))
+    let imagesToDelete = []
+    const deletedImagesJson = formData.get("deleted_images") || formData.get("images_to_delete")
+    if (typeof deletedImagesJson === "string" && deletedImagesJson.trim()) {
+      try {
+        const parsed = JSON.parse(deletedImagesJson)
+        if (Array.isArray(parsed)) {
+          imagesToDelete = parsed.filter((url) => typeof url === "string" && url.trim())
+        }
+      } catch (error) {
+        console.warn("Failed to parse deleted images JSON in updateDestination:", error)
+      }
+    }
 
-    // Merge existing + newly uploaded
-    payload.article_images = [...existingGallery, ...uploadedGalleryImages]
+    let finalGallery = []
+
+    if (galleryFromForm.length > 0) {
+      const deduped = []
+      const seen = new Set()
+      for (const url of galleryFromForm) {
+        const trimmed = url.trim()
+        if (!trimmed || imagesToDelete.includes(trimmed) || seen.has(trimmed)) continue
+        seen.add(trimmed)
+        deduped.push(trimmed)
+      }
+      finalGallery = deduped
+    } else {
+      // Legacy fallback path (support old forms)
+      let existingGallery = []
+      try {
+        existingGallery = JSON.parse(formData.get("existing_article_images") || "[]")
+      } catch {
+        existingGallery = []
+      }
+
+      const newGalleryFiles = Array.from(formData.getAll("article_images")).filter(
+        (file) => file && typeof file === 'object' && file.size > 0,
+      )
+
+      let uploadedGalleryImages = []
+      if (newGalleryFiles.length > 0) {
+        uploadedGalleryImages = await uploadFilesToStorage(newGalleryFiles, "uploads/destinations/articles")
+        console.log("Uploaded new gallery images (legacy path):", uploadedGalleryImages)
+      }
+
+      const keptExistingImages = existingGallery.filter((url) => !imagesToDelete.includes(url))
+      const merged = [...keptExistingImages, ...uploadedGalleryImages]
+      const deduped = []
+      const seen = new Set()
+      for (const url of merged) {
+        const trimmed = typeof url === "string" ? url.trim() : ""
+        if (!trimmed || seen.has(trimmed)) continue
+        seen.add(trimmed)
+        deduped.push(trimmed)
+      }
+      finalGallery = deduped
+    }
+
+    payload.article_images = finalGallery
 
     // ===== Optional storage cleanup of deleted images =====
     if (imagesToDelete.length > 0) {
@@ -248,6 +358,7 @@ export async function updateDestination(id, formData) {
         if (paths.length > 0) {
           // NOTE: replace 'uploads' with your actual bucket name if different
           await supabase.storage.from("uploads").remove(paths)
+          console.log("Deleted images from storage:", paths)
         }
       } catch (cleanupErr) {
         console.error("Image cleanup error:", cleanupErr)
@@ -255,12 +366,7 @@ export async function updateDestination(id, formData) {
       }
     }
 
-    // Clean up payload (remove undefined/null/empty values)
-    Object.keys(payload).forEach(key => {
-      if (payload[key] === undefined || payload[key] === null || payload[key] === "") {
-        delete payload[key]
-      }
-    })
+    console.log("Final update payload:", payload)
 
     const { data, error } = await supabase
       .from("tourist_destination")

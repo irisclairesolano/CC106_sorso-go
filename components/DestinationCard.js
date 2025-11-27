@@ -4,10 +4,15 @@ import { MapPin } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
+export const FEATURE_CARD_BASE_CLASSES = "overflow-hidden h-full flex flex-col group rounded-2xl border border-border/40 shadow-[0_20px_45px_-20px_rgba(15,23,42,0.35)] hover:shadow-[0_25px_60px_-25px_rgba(15,23,42,0.45)] transition-all duration-300 bg-card !p-0 !gap-0";
+export const FEATURE_CARD_IMAGE_CLASSES = "relative h-60 w-full overflow-hidden"; // The 'relative' position is required for next/image with fill prop
+export const FEATURE_CARD_CONTENT_CLASSES = "absolute bottom-0 left-0 w-full p-6";
+export const FEATURE_CARD_BODY_CLASSES = "p-6 flex-grow flex flex-col";
+
 export default function DestinationCard({ destination }) {
   return (
-    <Card className="overflow-hidden h-full flex flex-col group rounded-xl border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-      <div className="relative h-64 w-full overflow-hidden">
+    <Card className={FEATURE_CARD_BASE_CLASSES}>
+      <div className={FEATURE_CARD_IMAGE_CLASSES}>
         <Image
           src={destination.cover_image_url || destination.image_url || `/placeholder.svg?height=400&width=600&query=sorsogon+${destination.name}`}
           alt={destination.name}
@@ -28,7 +33,7 @@ export default function DestinationCard({ destination }) {
         </div>
 
         {/* Content */}
-        <div className="absolute bottom-0 left-0 w-full p-6">
+        <div className={FEATURE_CARD_CONTENT_CLASSES}>
           <h3 className="text-xl font-bold text-white mb-2 [text-shadow:_0_1px_4px_rgba(0,0,0,0.8)]">
             {destination.name}
           </h3>
@@ -40,8 +45,8 @@ export default function DestinationCard({ destination }) {
         </div>
       </div>
 
-      <CardContent className="p-6 flex-grow">
-        <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
+      <CardContent className={FEATURE_CARD_BODY_CLASSES}>
+        <p className="text-muted-foreground text-sm line-clamp-2 mb-4 flex-grow">
           {destination.description}
         </p>
         

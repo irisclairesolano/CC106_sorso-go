@@ -1,5 +1,5 @@
 import { isAdmin } from "@/app/actions/admin-actions"
-import AdminDashboard from "@/components/AdminDashboard"
+import AdminDashboardWrapper from "@/components/AdminDashboardWrapper"
 import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
@@ -17,6 +17,6 @@ export default async function AdminPage() {
     redirect("/admin-login")
   }
 
-  return <AdminDashboard />
+  return <AdminDashboardWrapper />
 }
 
