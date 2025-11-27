@@ -78,7 +78,7 @@ export async function submitContactForm(formData) {
   const email = formData.get("email")
   const subject = formData.get("subject")
   const message = formData.get("message")
-  const attachments = formData.getAll("attachments").filter((file) => file instanceof File)
+  const attachments = formData.getAll("attachments").filter((file) => file && typeof file === 'object' && file.size > 0)
   const attachmentUrls = attachments.length
     ? await uploadFilesToStorage(attachments, "uploads/contact")
     : []
@@ -112,14 +112,14 @@ export async function updateAboutInfo(formData) {
   const existingGallery = JSON.parse(formData.get("existing_gallery") || "[]")
   const heroImageExisting = formData.get("existing_hero_image")
   const heroImageFile = formData.get("hero_image")
-  const galleryFiles = formData.getAll("gallery_images").filter((file) => file instanceof File)
+  const galleryFiles = formData.getAll("gallery_images").filter((file) => file && typeof file === 'object' && file.size > 0)
 
   const culture_sections = cultureSectionsRaw ? JSON.parse(cultureSectionsRaw) : []
   const uploadedGallery = galleryFiles.length ? await uploadFilesToStorage(galleryFiles, "uploads/about") : []
   const gallery_images = [...existingGallery, ...uploadedGallery]
 
   let hero_image = heroImageExisting || ""
-  if (heroImageFile instanceof File && heroImageFile.size > 0) {
+  if (heroImageFile && typeof heroImageFile === 'object' && heroImageFile.size > 0) {
     hero_image = await uploadFileToStorage(heroImageFile, "uploads/about")
   }
 

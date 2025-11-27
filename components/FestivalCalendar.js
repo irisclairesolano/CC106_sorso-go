@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { CalendarDays, MapPin, ChevronLeft, ChevronRight, X } from "lucide-react"
 import Image from "next/image"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns"
@@ -17,11 +17,13 @@ export default function FestivalCalendar({ festivals }) {
   const monthEnd = endOfMonth(currentDate)
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd })
 
-  // Get festivals for current month
-  const currentMonthFestivals = festivals.filter((festival) => {
-    const festivalDate = new Date(festival.start_date)
-    return isSameMonth(festivalDate, currentDate)
-  })
+  // Get festivals for current month, sorted by start date (soonest first)
+  const currentMonthFestivals = festivals
+    .filter((festival) => {
+      const festivalDate = new Date(festival.start_date)
+      return isSameMonth(festivalDate, currentDate)
+    })
+    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
 
   // Group festivals by date
   const festivalsByDate = currentMonthFestivals.reduce((acc, festival) => {
@@ -182,6 +184,9 @@ export default function FestivalCalendar({ festivals }) {
             <>
               <DialogHeader>
                 <DialogTitle className="text-2xl">{selectedFestival.name}</DialogTitle>
+                <DialogDescription className="sr-only">
+                  Details about the {selectedFestival.name} festival
+                </DialogDescription>
                 <div className="space-y-2 mt-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CalendarDays className="h-4 w-4" />

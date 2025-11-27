@@ -145,10 +145,85 @@ export function usePreview() {
   const [previewUrl, setPreviewUrl] = useState('');
 
   const openPreview = (content, title = 'Preview', url = '') => {
-    setPreviewContent(content);
-    setPreviewTitle(title);
-    setPreviewUrl(url);
-    setIsPreviewOpen(true);
+    // Open preview in a new tab
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) {
+      previewWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${title} | SORSO-GO</title>
+          <style>
+            * { box-sizing: border-box; }
+            body { 
+              margin: 0; 
+              padding: 0;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: #f5f5f5;
+              min-height: 100vh;
+            }
+            .preview-header {
+              background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+              color: white;
+              padding: 12px 24px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              position: sticky;
+              top: 0;
+              z-index: 100;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            }
+            .preview-header h1 {
+              margin: 0;
+              font-size: 16px;
+              font-weight: 500;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .preview-badge {
+              background: rgba(255,255,255,0.2);
+              padding: 4px 10px;
+              border-radius: 12px;
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .preview-content {
+              max-width: 900px;
+              margin: 0 auto;
+              padding: 32px 24px;
+              background: white;
+              min-height: calc(100vh - 52px);
+              box-shadow: 0 0 40px rgba(0,0,0,0.08);
+            }
+            @media (max-width: 768px) {
+              .preview-content { padding: 20px 16px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="preview-header">
+            <h1>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              ${title}
+            </h1>
+            <span class="preview-badge">Preview Mode</span>
+          </div>
+          <div class="preview-content">
+            ${content}
+          </div>
+        </body>
+        </html>
+      `);
+      previewWindow.document.close();
+    }
   };
 
   const closePreview = () => {

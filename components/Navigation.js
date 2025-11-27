@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { MapPin, Menu, X } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 
 export default function Navigation({ showAdminButton = true }) {
   const pathname = usePathname()
@@ -28,19 +28,10 @@ export default function Navigation({ showAdminButton = true }) {
 
   // Handle scroll progress and navbar background
   useEffect(() => {
-    console.log('Setting up scroll listener...')
-    
     const handleScroll = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop
       const windowHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight
       const scrolled = windowHeight > 0 ? Math.min(100, (scrollTop / windowHeight) * 100) : 0
-      
-      console.log('Scroll event - Progress:', {
-        scrollTop,
-        windowHeight,
-        scrollProgress: scrolled,
-        isScrolled: scrollTop > 10
-      })
       
       setScrollProgress(scrolled)
       setIsScrolled(scrollTop > 10)
@@ -56,10 +47,7 @@ export default function Navigation({ showAdminButton = true }) {
     window.addEventListener('scroll', debouncedScroll, { passive: true })
     
     // Initial check with a small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      console.log('Initial scroll check')
-      handleScroll()
-    }, 300)
+    const timer = setTimeout(handleScroll, 300)
     
     return () => {
       clearTimeout(timeoutId)
@@ -76,18 +64,6 @@ export default function Navigation({ showAdminButton = true }) {
     { href: "/about", label: "About", section: "about" },
     { href: "/contact", label: "Contact", section: "contact" },
   ]
-
-  const scrollToSection = useCallback((sectionId) => {
-    if (typeof window === 'undefined') return
-    
-    const element = document.getElementById(sectionId)
-    if (element) {
-      window.scrollTo({
-        top: element.offsetTop - 80,
-        behavior: 'smooth'
-      })
-    }
-  }, [])
 
   const isActive = (route) => {
     if (!isHomePage) return pathname === route.href
@@ -133,11 +109,8 @@ export default function Navigation({ showAdminButton = true }) {
                   ? "text-palm-green" 
                   : "text-deep-sea/90 hover:text-palm-green"
               )}
-              onClick={(e) => {
-                if (isHomePage && route.section) {
-                  e.preventDefault()
-                  scrollToSection(route.section)
-                }
+              onClick={() => {
+                // Just close mobile menu, let Link handle navigation
                 setIsOpen(false)
               }}
             >
@@ -177,11 +150,8 @@ export default function Navigation({ showAdminButton = true }) {
               <div key={route.href} className="relative group">
                 <Link
                   href={route.href}
-                  onClick={(e) => {
-                    if (isHomePage && route.section) {
-                      e.preventDefault()
-                      scrollToSection(route.section)
-                    }
+                  onClick={() => {
+                    // Just close mobile menu, let Link handle navigation
                     setIsOpen(false)
                   }}
                   className={cn(
