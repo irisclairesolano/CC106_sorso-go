@@ -11,7 +11,8 @@ export default function Hero() {
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/hero_img.jpg"
+          src="https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2c/d5/10/80/caption.jpg?w=1200&h=1200&s=1"
+          
           alt="Sorsogon landscape"
           fill
           className="object-cover"

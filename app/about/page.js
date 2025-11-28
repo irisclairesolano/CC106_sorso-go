@@ -32,7 +32,7 @@ export default async function AboutPage() {
       <section className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
         <div className="relative h-[400px] rounded-3xl overflow-hidden">
           <Image
-            src={aboutInfo?.hero_image || "/sorsogon-culture.jpg"}
+            src={aboutInfo?.hero_image || "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2c/d5/10/80/caption.jpg?w=1200&h=1200&s=1"}
             alt="Sorsogon Culture"
             fill
             className="object-cover"
