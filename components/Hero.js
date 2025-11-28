@@ -1,16 +1,25 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
-import { ArrowRight, MapPin, Sparkles } from "lucide-react"
+import { ArrowRight, MapPin } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden w-full min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat" 
-             style={{ 
-               backgroundImage: 'url(/hero_img.jpg)',
-               backgroundSize: 'cover',
-               backgroundPosition: 'center',
-               backgroundRepeat: 'no-repeat'
-             }}>
+    <section className="relative overflow-hidden w-full min-h-screen flex items-center justify-center">
+      {/* Background Image */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/hero_img.jpg"
+          alt="Sorsogon landscape"
+          fill
+          className="object-cover"
+          priority
+          quality={85}
+          sizes="100vw"
+        />
+      </div>
       {/* Gradient overlays for depth */}
       <div className="absolute inset-0 bg-gradient-to-b from-palm-green/15 via-transparent to-deep-sea/30" />
       <div className="absolute inset-0 bg-gradient-to-r from-deep-sea/20 via-transparent to-deep-sea/20" />
@@ -22,11 +31,8 @@ export default function Hero() {
       
       <div className="container mx-auto relative z-10 px-4">
         <div className="mx-auto max-w-3xl text-center space-y-8">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 backdrop-blur-sm border border-palm-green/20 shadow-lg">
-            <Sparkles className="h-4 w-4 text-sunset-orange" />
-            <span className="text-sm font-medium text-deep-sea">Discover the Gateway to Bicol</span>
-          </div>
+         
+        
           
           {/* Main title */}
           <h1 className="text-5xl font-heading font-bold tracking-tight sm:text-7xl text-palm-green mb-6 drop-shadow-[0_2px_4px_rgba(255,255,255,0.9)]">
@@ -117,12 +123,17 @@ export default function Hero() {
       <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.25)] pointer-events-none" />
       
       {/* Scroll indicator */}
-      {/* <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-deep-sea/60 animate-bounce">
-        <span className="text-xs font-medium">Scroll to explore</span>
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-deep-sea/60 animate-bounce cursor-pointer" onClick={() => {
+        const nextSection = document.getElementById('destinations')
+        if (nextSection) {
+          nextSection.scrollIntoView({ behavior: 'smooth' })
+        }
+      }}>
+        {/* <span className="text-xs font-medium">Scroll to explore</span>
         <div className="w-6 h-10 border-2 border-deep-sea/40 rounded-full flex justify-center pt-2">
           <div className="w-1.5 h-3 bg-deep-sea/40 rounded-full animate-pulse" />
-        </div>
-      </div> */}
+        </div> */}
+      </div>
     </section>
   )
 }
