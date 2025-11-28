@@ -14,7 +14,12 @@ export async function getFestivals() {
     .order("start_date", { ascending: true })
 
   if (error) {
-    console.error("Error fetching festivals:", error)
+    console.error("Error fetching festivals:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    })
     return []
   }
   return data
@@ -35,7 +40,12 @@ export async function getFestivalsByMonth(year, month) {
     .order("start_date", { ascending: true })
 
   if (error) {
-    console.error("Error fetching festivals by month:", error)
+    console.error("Error fetching festivals by month:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    })
     return []
   }
   return data
@@ -55,7 +65,12 @@ export async function getUpcomingFestivals() {
     .limit(10)
 
   if (error) {
-    console.error("Error fetching upcoming festivals:", error)
+    console.error("Error fetching upcoming festivals:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    })
     return []
   }
   return data
@@ -72,7 +87,12 @@ export async function getFestivalById(id) {
     .single()
 
   if (error) {
-    console.error("Error fetching festival:", error)
+    console.error("Error fetching festival:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    })
     return null
   }
   return data

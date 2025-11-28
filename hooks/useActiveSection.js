@@ -6,7 +6,10 @@ import { useCallback, useEffect, useState } from "react"
 export function useActiveSection(sections = []) {
   const [activeSection, setActiveSection] = useState("")
 
-  const throttledSet = useCallback(throttle((id)=>setActiveSection(id),100),[])
+  const throttledSet = useCallback(
+    throttle((id) => setActiveSection(id), 100),
+    []
+  )
 
   const handleIntersection = useCallback((entries) => {
     entries.forEach(entry => {
@@ -14,10 +17,13 @@ export function useActiveSection(sections = []) {
         throttledSet(entry.target.id)
       }
     })
-  }, [])
+  }, [throttledSet])
 
   useEffect(() => {
-    if (typeof window === 'undefined' || sections.length === 0) return
+    if (typeof window === 'undefined' || sections.length === 0) {
+      setActiveSection("")
+      return
+    }
     
     const observerOptions = {
       root: null,
@@ -37,7 +43,7 @@ export function useActiveSection(sections = []) {
       })
     }
 
-    // Initial setup with delay
+    // Initial setup with delay to ensure DOM is ready
     const timer = setTimeout(() => {
       setupObservers()
     }, 500)
@@ -46,6 +52,7 @@ export function useActiveSection(sections = []) {
     return () => {
       clearTimeout(timer)
       observer.disconnect()
+      setActiveSection("")
     }
   }, [handleIntersection, sections])
 

@@ -13,22 +13,23 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
+import { useAdminStore } from "@/lib/store/adminStore"
 import { yupResolver } from '@hookform/resolvers/yup'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Edit2, Eye, FileText, Image as ImageIcon, Loader2, Plus, Star, Trash2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useForm } from 'react-hook-form'
 import * as yup from 'yup'
 
@@ -78,6 +79,15 @@ export default function AdminStoriesTab() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const { PreviewComponent, openPreview } = usePreview()
+  const {
+    selectedItems,
+    toggleSelectedItem,
+    clearSelectedItems,
+    setSelectedItems,
+    syncSelectedItems,
+    isLoading: bulkLoading,
+    setLoading,
+  } = useAdminStore()
   
   // State for media library
   const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false)
@@ -94,6 +104,16 @@ export default function AdminStoriesTab() {
     queryFn: getAllStories,
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
+
+  useEffect(() => {
+    if (!stories || stories.length === 0) {
+      clearSelectedItems()
+      return
+    }
+    const storyIds = stories.map((story) => story.id)
+    syncSelectedItems(storyIds)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stories])
   
   // Form handling
   const methods = useForm({
@@ -292,6 +312,71 @@ export default function AdminStoriesTab() {
     }
   }
   
+  const handleBulkApprove = async (ids) => {
+    if (!ids?.length) return
+    setLoading(true)
+    try {
+      await Promise.all(
+        ids.map(async (id) => {
+          const result = await approveStory(id)
+          if (!result?.success) {
+            throw new Error(result?.error || 'Failed to publish story')
+          }
+        })
+      )
+      toast({
+        title: 'Stories published',
+        description: `${ids.length} stor${ids.length > 1 ? 'ies' : 'y'} published successfully.`,
+      })
+      clearSelectedItems()
+      await queryClient.invalidateQueries(['adminStories'])
+    } catch (error) {
+      console.error('Bulk publish error:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to publish selected stories.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBulkDelete = async (ids) => {
+    if (!ids?.length) return
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${ids.length} stor${ids.length > 1 ? 'ies' : 'y'}? This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    setLoading(true)
+    try {
+      await Promise.all(
+        ids.map(async (id) => {
+          const result = await deleteStory(id)
+          if (!result?.success) {
+            throw new Error(result?.error || 'Failed to delete story')
+          }
+        })
+      )
+      toast({
+        title: 'Stories deleted',
+        description: `${ids.length} stor${ids.length > 1 ? 'ies' : 'y'} deleted successfully.`,
+      })
+      clearSelectedItems()
+      await queryClient.invalidateQueries(['adminStories'])
+    } catch (error) {
+      console.error('Bulk delete error:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete selected stories.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Handle story approval
   const handleApprove = async (id) => {
     try {

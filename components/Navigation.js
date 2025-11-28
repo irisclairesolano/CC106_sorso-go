@@ -13,15 +13,26 @@ export default function Navigation({ showAdminButton = true }) {
   const [isOpen, setIsOpen] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
   const isHomePage = pathname === "/"
+  const [sections, setSections] = useState([])
   
-  // Only observe sections that exist on the current page
-  const sections = ["hero", "destinations", "stories", "festivals", "about", "contact"]
-    .filter(section => {
-      if (typeof document !== 'undefined') {
-        return !!document.getElementById(section)
-      }
-      return false
-    })
+  // Only observe sections that exist on the current page - use useEffect to avoid hydration issues
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isHomePage) {
+      const availableSections = ["hero", "destinations", "stories", "festivals", "about", "contact"]
+        .filter(section => !!document.getElementById(section))
+      
+      // Only update if sections actually changed to avoid unnecessary re-renders
+      setSections(prev => {
+        if (prev.length !== availableSections.length || 
+            !prev.every((s, i) => s === availableSections[i])) {
+          return availableSections
+        }
+        return prev
+      })
+    } else {
+      setSections([])
+    }
+  }, [isHomePage, pathname])
   
   const activeSection = useActiveSection(sections)
   const [isScrolled, setIsScrolled] = useState(false)

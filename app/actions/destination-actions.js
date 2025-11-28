@@ -17,7 +17,12 @@ export async function getDestinations(includeAll = false) {
   const { data, error } = await query
 
   if (error) {
-    console.error("Error fetching destinations:", error)
+    console.error("Error fetching destinations:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    })
     return []
   }
   return data || []
@@ -36,7 +41,12 @@ export async function getDestinationById(id) {
       .single()
 
     if (error) {
-      console.error("Error fetching destination:", error)
+      console.error("Error fetching destination:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
       return null
     }
 
@@ -50,7 +60,13 @@ export async function getDestinationById(id) {
       article_images: data.article_images || []
     }
   } catch (error) {
-    console.error("Error in getDestinationById:", error)
+    console.error("Error in getDestinationById:", {
+      message: error?.message || 'Unknown error',
+      details: error?.details,
+      hint: error?.hint,
+      code: error?.code,
+      stack: error?.stack
+    })
     return null
   }
 }

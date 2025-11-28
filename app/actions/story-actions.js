@@ -20,7 +20,12 @@ export async function getStories() {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("Error fetching stories:", error)
+    console.error("Error fetching stories:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    })
     return []
   }
 
@@ -49,7 +54,12 @@ export async function getStoryById(id) {
     .single()
 
   if (error) {
-    console.error("Error fetching story:", error)
+    console.error("Error fetching story:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    })
     return null
   }
 

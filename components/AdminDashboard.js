@@ -1,25 +1,30 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { logoutAdmin } from "@/app/actions/admin-actions"
+import { DashboardSkeleton } from "@/components/admin/AdminSkeletons"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LogOut, Plus, Edit, Trash2, Check, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
-import AdminStoriesTab from "@/components/admin/AdminStoriesTab"
-import AdminFestivalsTab from "@/components/admin/AdminFestivalsTab"
-import AdminContactTab from "@/components/admin/AdminContactTab"
-import AdminDestinationsTab from "@/components/admin/AdminDestinationsTab"
-import AdminAboutTab from "@/components/admin/AdminAboutTab"
+import { useAdminStore } from "@/lib/store/adminStore"
+import { LogOut } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Suspense, lazy } from "react"
+
+const AdminStoriesTab = lazy(() => import("@/components/admin/AdminStoriesTab"))
+const AdminFestivalsTab = lazy(() => import("@/components/admin/AdminFestivalsTab"))
+const AdminContactTab = lazy(() => import("@/components/admin/AdminContactTab"))
+const AdminDestinationsTab = lazy(() => import("@/components/admin/AdminDestinationsTab"))
+const AdminAboutTab = lazy(() => import("@/components/admin/AdminAboutTab"))
 
 export default function AdminDashboard() {
   const router = useRouter()
   const { toast } = useToast()
+  const { clearSelectedItems } = useAdminStore()
 
   const handleLogout = async () => {
     await logoutAdmin()
+    clearSelectedItems()
     toast({
       title: "Logged out",
       description: "You have been successfully logged out.",
@@ -29,50 +34,68 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background w-full">
-      <div className="container py-8 mx-auto">
+    <div className="min-h-screen w-full bg-background">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold text-primary">Admin Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Manage content for Sorso-Go</p>
+            <h1 className="text-2xl font-bold text-primary sm:text-3xl">Admin Dashboard</h1>
+            <p className="mt-1 text-muted-foreground">Manage content for Sorso-Go</p>
           </div>
-          <Button variant="outline" onClick={handleLogout}>
+          <Button variant="outline" onClick={handleLogout} className="w-full sm:w-auto">
             <LogOut className="mr-2 h-4 w-4" />
             Logout
           </Button>
         </div>
 
         {/* Dashboard Tabs */}
-        <Tabs defaultValue="destinations" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="destinations">Destinations</TabsTrigger>
-            <TabsTrigger value="stories">Stories</TabsTrigger>
-            <TabsTrigger value="festivals">Festivals & Celebrations</TabsTrigger>
-            <TabsTrigger value="about">About Page</TabsTrigger>
-            <TabsTrigger value="contact">Contact Messages</TabsTrigger>
-          </TabsList>
+        <ErrorBoundary>
+          <Tabs
+            defaultValue="destinations"
+            className="space-y-6"
+            onValueChange={clearSelectedItems}
+          >
+            <div className="overflow-x-auto">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
+                <TabsTrigger value="destinations">Destinations</TabsTrigger>
+                <TabsTrigger value="stories">Stories</TabsTrigger>
+                <TabsTrigger value="festivals">Festivals</TabsTrigger>
+                <TabsTrigger value="about">About</TabsTrigger>
+                <TabsTrigger value="contact">Messages</TabsTrigger>
+              </TabsList>
+            </div>
 
-          <TabsContent value="destinations">
-            <AdminDestinationsTab />
-          </TabsContent>
+            <TabsContent value="destinations">
+              <Suspense fallback={<DashboardSkeleton />}>
+                <AdminDestinationsTab />
+              </Suspense>
+            </TabsContent>
 
-          <TabsContent value="stories">
-            <AdminStoriesTab />
-          </TabsContent>
+            <TabsContent value="stories">
+              <Suspense fallback={<DashboardSkeleton />}>
+                <AdminStoriesTab />
+              </Suspense>
+            </TabsContent>
 
-          <TabsContent value="festivals">
-            <AdminFestivalsTab />
-          </TabsContent>
+            <TabsContent value="festivals">
+              <Suspense fallback={<DashboardSkeleton />}>
+                <AdminFestivalsTab />
+              </Suspense>
+            </TabsContent>
 
-          <TabsContent value="about">
-            <AdminAboutTab />
-          </TabsContent>
+            <TabsContent value="about">
+              <Suspense fallback={<DashboardSkeleton />}>
+                <AdminAboutTab />
+              </Suspense>
+            </TabsContent>
 
-          <TabsContent value="contact">
-            <AdminContactTab />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="contact">
+              <Suspense fallback={<DashboardSkeleton />}>
+                <AdminContactTab />
+              </Suspense>
+            </TabsContent>
+          </Tabs>
+        </ErrorBoundary>
       </div>
     </div>
   )
