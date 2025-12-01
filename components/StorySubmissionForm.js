@@ -25,19 +25,22 @@ export default function StorySubmissionForm() {
     getDestinations().then(setDestinations)
   }, [])
 
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files)
+  const handleImageChange = async (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
     const validFiles = []
     const newPreviews = []
 
-    files.forEach((file) => {
+    // Validate all files first
+    for (const file of files) {
       if (file.size > 5 * 1024 * 1024) {
         toast({
           title: "File too large",
           description: `${file.name} is larger than 5MB. Please choose a smaller file.`,
           variant: "destructive",
         })
-        return
+        continue
       }
 
       if (!file.type.startsWith("image/")) {
@@ -46,21 +49,33 @@ export default function StorySubmissionForm() {
           description: `${file.name} is not an image file.`,
           variant: "destructive",
         })
-        return
+        continue
       }
 
       validFiles.push(file)
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        newPreviews.push(e.target.result)
-        if (newPreviews.length === validFiles.length) {
-          setImagePreviews([...imagePreviews, ...newPreviews])
-        }
-      }
-      reader.readAsDataURL(file)
+    }
+
+    if (validFiles.length === 0) {
+      e.target.value = ""
+      return
+    }
+
+    // Create previews for all valid files
+    const previewPromises = validFiles.map((file) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target.result)
+        reader.onerror = () => resolve(null)
+        reader.readAsDataURL(file)
+      })
     })
 
-    setImages([...images, ...validFiles])
+    const previews = await Promise.all(previewPromises)
+    const validPreviews = previews.filter(Boolean)
+
+    // Update state with all files and previews at once
+    setImages((prev) => [...prev, ...validFiles])
+    setImagePreviews((prev) => [...prev, ...validPreviews])
     e.target.value = ""
   }
 
@@ -75,37 +90,58 @@ export default function StorySubmissionForm() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setIsSubmitting(true)
-
-    const formData = new FormData(e.target)
-    formData.delete("images")
-    images.forEach((file) => formData.append("images", file))
-
-    // Add destination_id if selected
-    if (selectedDestination && selectedDestination !== "none") {
-      formData.append("destination_id", selectedDestination)
-    }
-
-    const result = await createStory(formData)
-
-    if (result.success) {
+    
+    // Validate content length
+    const content = e.target.content?.value || ""
+    if (content.trim().length < 200) {
       toast({
-        title: "Story submitted!",
-        description: "Thank you for sharing! Your story is under review and will be published soon.",
-      })
-      e.target.reset()
-      setImages([])
-      setImagePreviews([])
-      setSelectedDestination("")
-    } else {
-      toast({
-        title: "Error",
-        description: result.error || "Failed to submit story. Please try again.",
+        title: "Content too short",
+        description: "Please write at least 200 characters for your story.",
         variant: "destructive",
       })
+      return
     }
 
-    setIsSubmitting(false)
+    setIsSubmitting(true)
+
+    try {
+      const formData = new FormData(e.target)
+      formData.delete("images")
+      images.forEach((file) => formData.append("images", file))
+
+      // Add destination_id if selected
+      if (selectedDestination && selectedDestination !== "none") {
+        formData.append("destination_id", selectedDestination)
+      }
+
+      const result = await createStory(formData)
+
+      if (result.success) {
+        toast({
+          title: "Story submitted!",
+          description: "Thank you for sharing! Your story is under review and will be published soon.",
+        })
+        e.target.reset()
+        setImages([])
+        setImagePreviews([])
+        setSelectedDestination("")
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to submit story. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error submitting story:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit story. Please check your connection and try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -158,7 +194,7 @@ export default function StorySubmissionForm() {
           className="resize-none"
           minLength={200}
         />
-        <p className="text-xs text-muted-foreground">Minimum 200 characters recommended</p>
+        <p className="text-xs text-muted-foreground">Minimum 200 characters required</p>
       </div>
 
       <div className="space-y-2">
@@ -175,11 +211,12 @@ export default function StorySubmissionForm() {
           />
           <label
             htmlFor="images"
-            className="cursor-pointer flex flex-col items-center gap-2"
+            className="cursor-pointer flex flex-col items-center gap-2 py-4 touch-manipulation"
+            style={{ minHeight: '120px' }}
           >
             <Upload className="h-8 w-8 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">
-              Click to upload images or drag and drop
+            <span className="text-sm text-muted-foreground text-center px-4">
+              Tap to upload images
             </span>
             <span className="text-xs text-muted-foreground">PNG, JPG up to 5MB each</span>
           </label>
@@ -195,8 +232,9 @@ export default function StorySubmissionForm() {
                 <button
                   type="button"
                   onClick={() => removeImage(index)}
-                  className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity touch-manipulation"
                   aria-label="Remove image"
+                  style={{ minWidth: '32px', minHeight: '32px' }}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -214,7 +252,13 @@ export default function StorySubmissionForm() {
         </p>
       </div>
 
-      <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+      <Button 
+        type="submit" 
+        size="lg" 
+        className="w-full touch-manipulation" 
+        disabled={isSubmitting}
+        style={{ minHeight: '48px' }}
+      >
         {isSubmitting ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
