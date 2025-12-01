@@ -20,12 +20,14 @@ export async function getStories() {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("Error fetching stories:", {
+    const errorInfo = {
       message: error.message,
       details: error.details,
       hint: error.hint,
-      code: error.code
-    })
+      code: error.code,
+      ...(error.stack && { stack: error.stack })
+    }
+    console.error("Error fetching stories:", JSON.stringify(errorInfo, null, 2))
     return []
   }
 
@@ -54,12 +56,14 @@ export async function getStoryById(id) {
     .single()
 
   if (error) {
-    console.error("Error fetching story:", {
+    const errorInfo = {
       message: error.message,
       details: error.details,
       hint: error.hint,
-      code: error.code
-    })
+      code: error.code,
+      ...(error.stack && { stack: error.stack })
+    }
+    console.error("Error fetching story:", JSON.stringify(errorInfo, null, 2))
     return null
   }
 

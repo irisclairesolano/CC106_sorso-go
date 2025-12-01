@@ -89,12 +89,14 @@ export async function getFeaturedDestinations() {
         console.log("The 'tourist_destination' table does not exist in your database.");
         return [];
       }
-      console.error("Error querying tourist_destination table:", {
+      const errorInfo = {
         message: error.message,
         details: error.details,
         hint: error.hint,
-        code: error.code
-      });
+        code: error.code,
+        ...(error.stack && { stack: error.stack })
+      }
+      console.error("Error querying tourist_destination table:", JSON.stringify(errorInfo, null, 2));
       return [];
     }
 

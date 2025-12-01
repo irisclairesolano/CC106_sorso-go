@@ -23,13 +23,13 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { useAdminStore } from "@/lib/store/adminStore"
+import { useClearSelectedItems, useError, useIsLoading, useSelectedItems, useSetLoading, useSetSelectedItems, useSyncSelectedItems, useToggleSelectedItem } from "@/lib/store/adminStore"
 import { yupResolver } from '@hookform/resolvers/yup'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Edit2, Eye, FileText, Image as ImageIcon, Loader2, Plus, Star, Trash2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useForm } from 'react-hook-form'
 import * as yup from 'yup'
 
@@ -79,15 +79,16 @@ export default function AdminStoriesTab() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const { PreviewComponent, openPreview } = usePreview()
-  const {
-    selectedItems,
-    toggleSelectedItem,
-    clearSelectedItems,
-    setSelectedItems,
-    syncSelectedItems,
-    isLoading: bulkLoading,
-    setLoading,
-  } = useAdminStore()
+  
+  // Use individual selectors to prevent infinite re-renders
+  const selectedItems = useSelectedItems()
+  const bulkLoading = useIsLoading()
+  const error = useError()
+  const toggleSelectedItem = useToggleSelectedItem()
+  const clearSelectedItems = useClearSelectedItems()
+  const setSelectedItems = useSetSelectedItems()
+  const syncSelectedItems = useSyncSelectedItems()
+  const setLoading = useSetLoading()
   
   // State for media library
   const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false)
@@ -105,13 +106,19 @@ export default function AdminStoriesTab() {
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
 
+  // Use refs to store the latest functions to avoid dependency issues
+  const clearSelectedItemsRef = useRef(clearSelectedItems)
+  const syncSelectedItemsRef = useRef(syncSelectedItems)
+  clearSelectedItemsRef.current = clearSelectedItems
+  syncSelectedItemsRef.current = syncSelectedItems
+
   useEffect(() => {
     if (!stories || stories.length === 0) {
-      clearSelectedItems()
+      clearSelectedItemsRef.current()
       return
     }
     const storyIds = stories.map((story) => story.id)
-    syncSelectedItems(storyIds)
+    syncSelectedItemsRef.current(storyIds)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stories])
   
