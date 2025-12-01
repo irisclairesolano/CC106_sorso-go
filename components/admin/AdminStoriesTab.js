@@ -109,16 +109,26 @@ export default function AdminStoriesTab() {
   // Use refs to store the latest functions to avoid dependency issues
   const clearSelectedItemsRef = useRef(clearSelectedItems)
   const syncSelectedItemsRef = useRef(syncSelectedItems)
-  clearSelectedItemsRef.current = clearSelectedItems
-  syncSelectedItemsRef.current = syncSelectedItems
+  
+  // Update refs in effect to avoid state updates during render
+  useEffect(() => {
+    clearSelectedItemsRef.current = clearSelectedItems
+    syncSelectedItemsRef.current = syncSelectedItems
+  }, [clearSelectedItems, syncSelectedItems])
 
   useEffect(() => {
     if (!stories || stories.length === 0) {
-      clearSelectedItemsRef.current()
+      // Use setTimeout to defer state update to avoid React error #185
+      setTimeout(() => {
+        clearSelectedItemsRef.current()
+      }, 0)
       return
     }
     const storyIds = stories.map((story) => story.id)
-    syncSelectedItemsRef.current(storyIds)
+    // Use setTimeout to defer state update to avoid React error #185
+    setTimeout(() => {
+      syncSelectedItemsRef.current(storyIds)
+    }, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stories])
   
