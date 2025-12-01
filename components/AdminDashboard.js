@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useClearSelectedItems } from "@/lib/store/adminStore"
 import { LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { Suspense, lazy, useCallback, useRef } from "react"
+import { Suspense, lazy, useCallback, useEffect, useRef } from "react"
 
 const AdminStoriesTab = lazy(() => import("@/components/admin/AdminStoriesTab"))
 const AdminFestivalsTab = lazy(() => import("@/components/admin/AdminFestivalsTab"))
@@ -24,11 +24,18 @@ export default function AdminDashboard() {
 
   // Use ref to store the latest clearSelectedItems to avoid dependency issues
   const clearSelectedItemsRef = useRef(clearSelectedItems)
-  clearSelectedItemsRef.current = clearSelectedItems
+  
+  // Update ref in effect to avoid state updates during render
+  useEffect(() => {
+    clearSelectedItemsRef.current = clearSelectedItems
+  }, [clearSelectedItems])
 
   // Memoize the clearSelectedItems callback to prevent infinite re-renders
   const handleTabChange = useCallback(() => {
-    clearSelectedItemsRef.current()
+    // Use setTimeout to defer state update to avoid React error #185
+    setTimeout(() => {
+      clearSelectedItemsRef.current()
+    }, 0)
   }, [])
 
   const handleLogout = async () => {

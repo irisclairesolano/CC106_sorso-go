@@ -7,47 +7,88 @@ import { randomUUID } from "crypto"
 
 const BUCKET_NAME = "spots"
 const MEDIA_FOLDER = "uploads/media"
+const STORIES_FOLDER = "stories"
+const STORIES_GALLERY_FOLDER = "stories/gallery"
 
 /**
- * Get all media files from the storage bucket
+ * Helper function to list files from a specific folder
  */
-export async function getMediaFiles() {
+async function listFilesFromFolder(folder) {
   try {
-    // List all files in the media folder
     const { data, error } = await supabaseAdmin.storage
       .from(BUCKET_NAME)
-      .list(MEDIA_FOLDER, {
-        limit: 100,
+      .list(folder, {
+        limit: 1000,
         offset: 0,
         sortBy: { column: 'created_at', order: 'desc' }
       })
 
     if (error) {
-      console.error("Error listing media files:", error)
-      return { success: false, error: error.message }
+      console.warn(`Error listing files from ${folder}:`, error.message)
+      return []
     }
 
     // Filter out folders and map to include full URLs
-    const files = (data || [])
+    return (data || [])
       .filter(file => file.name && !file.name.endsWith('/'))
       .map(file => {
-        const path = `${MEDIA_FOLDER}/${file.name}`
+        const path = `${folder}/${file.name}`
         const { data: urlData } = supabaseAdmin.storage
           .from(BUCKET_NAME)
           .getPublicUrl(path)
         
         return {
-          id: file.id || file.name,
+          id: `${folder}-${file.id || file.name}`, // Unique ID with folder prefix
           name: file.name,
           path: path,
           url: urlData?.publicUrl || '',
           size: formatFileSize(file.metadata?.size || 0),
           type: file.metadata?.mimetype || 'image/jpeg',
-          created_at: file.created_at
+          created_at: file.created_at,
+          source: folder // Track which folder the file came from
         }
       })
+  } catch (error) {
+    console.warn(`Error processing files from ${folder}:`, error.message)
+    return []
+  }
+}
 
-    return { success: true, data: files }
+/**
+ * Get all media files from the storage bucket
+ * Now includes files from uploads/media, stories, and stories/gallery folders
+ */
+export async function getMediaFiles() {
+  try {
+    // Fetch files from all folders in parallel
+    const [mediaFiles, storiesFiles, galleryFiles] = await Promise.all([
+      listFilesFromFolder(MEDIA_FOLDER),
+      listFilesFromFolder(STORIES_FOLDER),
+      listFilesFromFolder(STORIES_GALLERY_FOLDER)
+    ])
+
+    // Combine all files
+    const allFiles = [...mediaFiles, ...storiesFiles, ...galleryFiles]
+
+    // Remove duplicates based on URL (same image might exist in multiple folders)
+    const uniqueFiles = []
+    const seenUrls = new Set()
+    
+    for (const file of allFiles) {
+      if (file.url && !seenUrls.has(file.url)) {
+        seenUrls.add(file.url)
+        uniqueFiles.push(file)
+      }
+    }
+
+    // Sort by created_at descending (newest first)
+    uniqueFiles.sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+      return dateB - dateA
+    })
+
+    return { success: true, data: uniqueFiles }
   } catch (error) {
     console.error("Error in getMediaFiles:", error)
     return { success: false, error: error.message || "Failed to fetch media files" }
