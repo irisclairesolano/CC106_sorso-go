@@ -6,10 +6,10 @@ import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
-import { useAdminStore } from "@/lib/store/adminStore"
+import { useClearSelectedItems } from "@/lib/store/adminStore"
 import { LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { Suspense, lazy } from "react"
+import { Suspense, lazy, useCallback, useRef } from "react"
 
 const AdminStoriesTab = lazy(() => import("@/components/admin/AdminStoriesTab"))
 const AdminFestivalsTab = lazy(() => import("@/components/admin/AdminFestivalsTab"))
@@ -20,7 +20,16 @@ const AdminAboutTab = lazy(() => import("@/components/admin/AdminAboutTab"))
 export default function AdminDashboard() {
   const router = useRouter()
   const { toast } = useToast()
-  const { clearSelectedItems } = useAdminStore()
+  const clearSelectedItems = useClearSelectedItems()
+
+  // Use ref to store the latest clearSelectedItems to avoid dependency issues
+  const clearSelectedItemsRef = useRef(clearSelectedItems)
+  clearSelectedItemsRef.current = clearSelectedItems
+
+  // Memoize the clearSelectedItems callback to prevent infinite re-renders
+  const handleTabChange = useCallback(() => {
+    clearSelectedItemsRef.current()
+  }, [])
 
   const handleLogout = async () => {
     await logoutAdmin()
@@ -53,7 +62,7 @@ export default function AdminDashboard() {
           <Tabs
             defaultValue="destinations"
             className="space-y-6"
-            onValueChange={clearSelectedItems}
+            onValueChange={handleTabChange}
           >
             <div className="overflow-x-auto">
               <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5">

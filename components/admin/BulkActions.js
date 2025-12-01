@@ -1,11 +1,12 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { useAdminStore } from "@/lib/store/adminStore"
+import { useClearSelectedItems, useSelectedItems } from "@/lib/store/adminStore"
 import { Check, Trash2, X } from "lucide-react"
 
 export function BulkActions({ onDelete, onPublish, onUnpublish }) {
-  const { selectedItems, clearSelectedItems } = useAdminStore()
+  const selectedItems = useSelectedItems()
+  const clearSelectedItems = useClearSelectedItems()
 
   if (selectedItems.length === 0) return null
 

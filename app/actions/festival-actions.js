@@ -14,12 +14,14 @@ export async function getFestivals() {
     .order("start_date", { ascending: true })
 
   if (error) {
-    console.error("Error fetching festivals:", {
+    const errorInfo = {
       message: error.message,
       details: error.details,
       hint: error.hint,
-      code: error.code
-    })
+      code: error.code,
+      ...(error.stack && { stack: error.stack })
+    }
+    console.error("Error fetching festivals:", JSON.stringify(errorInfo, null, 2))
     return []
   }
   return data
@@ -40,12 +42,14 @@ export async function getFestivalsByMonth(year, month) {
     .order("start_date", { ascending: true })
 
   if (error) {
-    console.error("Error fetching festivals by month:", {
+    const errorInfo = {
       message: error.message,
       details: error.details,
       hint: error.hint,
-      code: error.code
-    })
+      code: error.code,
+      ...(error.stack && { stack: error.stack })
+    }
+    console.error("Error fetching festivals by month:", JSON.stringify(errorInfo, null, 2))
     return []
   }
   return data
@@ -65,12 +69,14 @@ export async function getUpcomingFestivals() {
     .limit(10)
 
   if (error) {
-    console.error("Error fetching upcoming festivals:", {
+    const errorInfo = {
       message: error.message,
       details: error.details,
       hint: error.hint,
-      code: error.code
-    })
+      code: error.code,
+      ...(error.stack && { stack: error.stack })
+    }
+    console.error("Error fetching upcoming festivals:", JSON.stringify(errorInfo, null, 2))
     return []
   }
   return data
@@ -87,12 +93,14 @@ export async function getFestivalById(id) {
     .single()
 
   if (error) {
-    console.error("Error fetching festival:", {
+    const errorInfo = {
       message: error.message,
       details: error.details,
       hint: error.hint,
-      code: error.code
-    })
+      code: error.code,
+      ...(error.stack && { stack: error.stack })
+    }
+    console.error("Error fetching festival:", JSON.stringify(errorInfo, null, 2))
     return null
   }
   return data
