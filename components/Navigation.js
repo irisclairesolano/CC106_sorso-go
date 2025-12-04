@@ -26,7 +26,7 @@ export default function Navigation({ showAdminButton = true }) {
         if (prev.length !== availableSections.length || 
             !prev.every((s, i) => s === availableSections[i])) {
           return availableSections
-        }
+      }
         return prev
       })
     } else {
@@ -72,6 +72,8 @@ export default function Navigation({ showAdminButton = true }) {
     { href: "/destinations", label: "Destinations", section: "destinations" },
     { href: "/stories", label: "Stories", section: "stories" },
     { href: "/festivals", label: "Festivals", section: "festivals" },
+    { href: "/sustainable", label: "Sustainable Travel" },
+    { href: "/tips", label: "Travel Tips" },
     { href: "/about", label: "About", section: "about" },
     { href: "/contact", label: "Contact", section: "contact" },
   ]

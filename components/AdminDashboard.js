@@ -15,7 +15,8 @@ const AdminStoriesTab = lazy(() => import("@/components/admin/AdminStoriesTab"))
 const AdminFestivalsTab = lazy(() => import("@/components/admin/AdminFestivalsTab"))
 const AdminContactTab = lazy(() => import("@/components/admin/AdminContactTab"))
 const AdminDestinationsTab = lazy(() => import("@/components/admin/AdminDestinationsTab"))
-const AdminAboutTab = lazy(() => import("@/components/admin/AdminAboutTab"))
+const AdminTravelTipsTab = lazy(() => import("@/components/admin/AdminTravelTipsTab"))
+const AdminSustainableTab = lazy(() => import("@/components/admin/AdminSustainableTab"))
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -72,11 +73,12 @@ export default function AdminDashboard() {
             onValueChange={handleTabChange}
           >
             <div className="overflow-x-auto">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6">
                 <TabsTrigger value="destinations">Destinations</TabsTrigger>
                 <TabsTrigger value="stories">Stories</TabsTrigger>
                 <TabsTrigger value="festivals">Festivals</TabsTrigger>
-                <TabsTrigger value="about">About</TabsTrigger>
+                <TabsTrigger value="tips">Travel Tips</TabsTrigger>
+                <TabsTrigger value="sustainable">Sustainable</TabsTrigger>
                 <TabsTrigger value="contact">Messages</TabsTrigger>
               </TabsList>
             </div>
@@ -99,9 +101,15 @@ export default function AdminDashboard() {
               </Suspense>
             </TabsContent>
 
-            <TabsContent value="about">
+            <TabsContent value="tips">
               <Suspense fallback={<DashboardSkeleton />}>
-                <AdminAboutTab />
+                <AdminTravelTipsTab />
+              </Suspense>
+            </TabsContent>
+
+            <TabsContent value="sustainable">
+              <Suspense fallback={<DashboardSkeleton />}>
+                <AdminSustainableTab />
               </Suspense>
             </TabsContent>
 

@@ -101,3 +101,11 @@ create table public.festival (
   created_at timestamptz default now()
 );
 
+-- SUSTAINABLE TRAVEL
+create table public.sustainable_travel (
+  id serial primary key,
+  s_title text not null,
+  s_description text not null,
+  created_at timestamptz default now()
+);
+

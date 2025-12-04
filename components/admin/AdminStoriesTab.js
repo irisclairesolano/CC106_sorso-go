@@ -79,6 +79,7 @@ export default function AdminStoriesTab() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const { PreviewComponent, openPreview } = usePreview()
+  const [searchQuery, setSearchQuery] = useState("")
   
   // Use individual selectors to prevent infinite re-renders
   const selectedItems = useSelectedItems()
@@ -105,6 +106,22 @@ export default function AdminStoriesTab() {
     queryFn: getAllStories,
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
+
+  // Filter stories based on search query
+  const filteredStories = useMemo(() => {
+    if (!searchQuery.trim()) return stories
+    
+    const query = searchQuery.toLowerCase()
+    return stories.filter(story => 
+      story.title.toLowerCase().includes(query) ||
+      story.author_name.toLowerCase().includes(query) ||
+      story.content.toLowerCase().includes(query) ||
+      story.tags?.some(tag => {
+        const tagText = typeof tag === 'object' ? tag.name : tag
+        return tagText.toLowerCase().includes(query)
+      })
+    )
+  }, [stories, searchQuery])
 
   // Use refs to store the latest functions to avoid dependency issues
   const clearSelectedItemsRef = useRef(clearSelectedItems)
@@ -557,17 +574,28 @@ export default function AdminStoriesTab() {
             <h3 className="text-xl font-semibold">Stories</h3>
             <p className="text-sm text-muted-foreground">Manage community travel stories and submissions.</p>
           </div>
-          <div className="flex gap-2">
-            <Link href="/story-submission" target="_blank">
-              <Button variant="outline">
-                <Eye className="mr-2 h-4 w-4" />
-                Public Form
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search stories..."
+                className="pl-10 w-64"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Link href="/story-submission" target="_blank">
+                <Button variant="outline">
+                  <Eye className="mr-2 h-4 w-4" />
+                  Public Form
+                </Button>
+              </Link>
+              <Button onClick={startCreate}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Story
               </Button>
-            </Link>
-            <Button onClick={startCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Story
-            </Button>
+            </div>
           </div>
         </div>
 
@@ -615,7 +643,7 @@ export default function AdminStoriesTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {stories.map((story) => (
+                {filteredStories.map((story) => (
                   <TableRow key={story.id}>
                     <TableCell className="font-medium max-w-[200px]">
                       <div className="flex items-center gap-3">

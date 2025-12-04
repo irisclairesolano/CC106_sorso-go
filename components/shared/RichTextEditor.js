@@ -35,8 +35,25 @@ export function RichTextEditor({ value, onChange, placeholder = 'Write something
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[200px] p-4',
+        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[200px] max-h-[400px] overflow-y-auto p-4 resize-y',
       },
+    },
+    handleKeyDown: ({ event }) => {
+      // Handle Tab key
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        
+        // Insert tab character or handle indentation
+        if (event.shiftKey) {
+          // Shift+Tab - outdent
+          editor.chain().focus().outdent().run();
+        } else {
+          // Tab - indent
+          editor.chain().focus().indent().run();
+        }
+        return true;
+      }
+      return false;
     },
   });
 
@@ -82,8 +99,9 @@ export function RichTextEditor({ value, onChange, placeholder = 'Write something
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="border-b p-2 flex flex-wrap gap-1">
+    <div className="border rounded-lg overflow-hidden w-full">
+      <div className="border-b p-2 flex flex-wrap gap-1 overflow-x-auto max-w-full">
+        <div className="flex gap-1 flex-shrink-0">
         <Button
           type="button"
           variant="ghost"
@@ -165,6 +183,7 @@ export function RichTextEditor({ value, onChange, placeholder = 'Write something
         >
           <Redo className="h-4 w-4" />
         </Button>
+        </div>
       </div>
       <EditorContent editor={editor} placeholder={placeholder} />
     </div>

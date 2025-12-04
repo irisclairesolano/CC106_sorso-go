@@ -1,13 +1,16 @@
-import { getAboutInfo, getTravelTips } from "@/app/actions/general-actions"
-import TravelTipCard from "@/components/TravelTipCard"
-import { Card, CardContent } from "@/components/ui/card"
-import Image from "next/image"
+export const revalidate = 30; // Revalidate every 30 seconds for faster updates
+
+import { getAboutInfo, getSustainableEntries } from "@/app/actions/general-actions";
+import { Card, CardContent } from "@/components/ui/card";
+import Image from "next/image";
 
 export default async function AboutPage() {
   const aboutInfo = await getAboutInfo()
-  const tips = await getTravelTips()
-  const cultureSections =
-    aboutInfo?.culture_sections?.length > 0
+  const sustainableEntries = await getSustainableEntries()
+  
+  const cultureSections = sustainableEntries?.length > 0
+    ? sustainableEntries.map(entry => ({ title: entry.s_title, description: entry.s_description }))
+    : aboutInfo?.culture_sections?.length > 0
       ? aboutInfo.culture_sections
       : [
           { title: "Eco-Friendly Practices", description: "Use reusable water bottles..." },
@@ -20,7 +23,17 @@ export default async function AboutPage() {
   return (
     <div className="container mx-auto py-12 space-y-20">
       {/* Intro Section */}
-      <section className="text-center max-w-3xl mx-auto">
+      <section className="text-center max-w-4xl mx-auto">
+        <div className="mb-8">
+          <Image
+            src="/sorsogon.jpeg"
+            alt="Sorsogon Province - Beautiful landscape and scenery"
+            width={800}
+            height={400}
+            className="rounded-2xl shadow-xl mx-auto object-cover"
+            priority
+          />
+        </div>
         <h1 className="text-4xl md:text-5xl font-bold text-primary mb-6">About Sorsogon</h1>
         <p className="text-xl text-muted-foreground leading-relaxed">
           {aboutInfo?.description ||
@@ -32,7 +45,7 @@ export default async function AboutPage() {
       <section className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
         <div className="relative h-[400px] rounded-3xl overflow-hidden">
           <Image
-            src={aboutInfo?.hero_image || "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2c/d5/10/80/caption.jpg?w=1200&h=1200&s=1"}
+            src={aboutInfo?.hero_image || "/sorsogon-culture.jpg"}
             alt="Sorsogon Culture"
             fill
             className="object-cover"
@@ -126,39 +139,6 @@ export default async function AboutPage() {
               </li>
             </ul>
           </div>
-        </div>
-      </section>
-
-      {/* Travel Tips */}
-      <section>
-        <h2 className="text-3xl font-bold text-primary mb-8 text-center">Travel Tips</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tips.length > 0 ? (
-            tips.map((tip) => <TravelTipCard key={tip.id} tip={tip} />)
-          ) : (
-            // Fallback tips if DB is empty
-            <>
-              <TravelTipCard
-                tip={{
-                  title: "Best Time to Visit",
-                  content:
-                    "The dry season from November to May is ideal for beach hopping and whale shark interaction.",
-                }}
-              />
-              <TravelTipCard
-                tip={{
-                  title: "Getting There",
-                  content: "You can take a flight to Legazpi City or a bus directly to Sorsogon City from Manila.",
-                }}
-              />
-              <TravelTipCard
-                tip={{
-                  title: "Local Delicacies",
-                  content: "Don't miss trying the Pili nut candies and the spicy Bicol Express.",
-                }}
-              />
-            </>
-          )}
         </div>
       </section>
     </div>
