@@ -1,8 +1,8 @@
 "use server"
 
+import { uploadFileToStorage, uploadFilesToStorage } from "@/lib/storage"
 import { supabase } from "@/lib/supabaseClient"
 import { revalidatePath } from "next/cache"
-import { uploadFileToStorage, uploadFilesToStorage } from "@/lib/storage"
 
 // Travel Tips
 export async function getTravelTips() {
@@ -145,4 +145,89 @@ export async function updateAboutInfo(formData) {
   revalidatePath("/about")
   revalidatePath("/admin")
   return { success: true, data }
+}
+
+// Sustainable Travel Entries
+export async function getSustainableEntries() {
+  const { data, error } = await supabase
+    .from("sustainable_travel")
+    .select("*")
+    .order("created_at", { ascending: false })
+
+  if (error) return []
+  return data || []
+}
+
+export async function createSustainableEntry(formData) {
+  try {
+    const title = formData.get("title")
+    const description = formData.get("description")
+
+    if (!title || !description) {
+      return { success: false, error: "Title and description are required" }
+    }
+
+    const { data, error } = await supabase
+      .from("sustainable_travel")
+      .insert([{ s_title: title, s_description: description }])
+      .select()
+      .single()
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/about")
+    revalidatePath("/admin")
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
+}
+
+export async function updateSustainableEntry(id, formData) {
+  try {
+    const title = formData.get("title")
+    const description = formData.get("description")
+
+    if (!title || !description) {
+      return { success: false, error: "Title and description are required" }
+    }
+
+    const { data, error } = await supabase
+      .from("sustainable_travel")
+      .update({ s_title: title, s_description: description })
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/about")
+    revalidatePath("/admin")
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
+}
+
+export async function deleteSustainableEntry(id) {
+  try {
+    const { error } = await supabase
+      .from("sustainable_travel")
+      .delete()
+      .eq("id", id)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/about")
+    revalidatePath("/admin")
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
 }

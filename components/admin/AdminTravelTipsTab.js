@@ -1,21 +1,22 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { getTravelTips, createTravelTip, updateTravelTip, deleteTravelTip } from "@/app/actions/general-actions"
+import { createTravelTip, deleteTravelTip, getTravelTips, updateTravelTip } from "@/app/actions/general-actions"
+import { RichTextEditor } from "@/components/shared/RichTextEditor"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Plus, Edit, Trash2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { Edit, Plus, Trash2 } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export default function AdminTravelTipsTab() {
   const [tips, setTips] = useState([])
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTip, setEditingTip] = useState(null)
+  const [newTipContent, setNewTipContent] = useState('') // For new tips
   const { toast } = useToast()
 
   useEffect(() => {
@@ -32,6 +33,18 @@ export default function AdminTravelTipsTab() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     const formData = new FormData(e.target)
+    
+    // Get content from the appropriate source
+    const content = editingTip ? editingTip.content : newTipContent
+    formData.set('content', content)
+    
+    console.log('Submitting:', {
+      title: formData.get('title'),
+      content: content,
+      contentLength: content.length,
+      isEditing: !!editingTip
+    })
+    
     const result = editingTip
       ? await updateTravelTip(editingTip.id, formData)
       : await createTravelTip(formData)
@@ -43,6 +56,7 @@ export default function AdminTravelTipsTab() {
       })
       setIsDialogOpen(false)
       setEditingTip(null)
+      setNewTipContent('') // Reset new tip content
       loadTips()
     } else {
       toast({
@@ -54,6 +68,7 @@ export default function AdminTravelTipsTab() {
   }
 
   const handleEdit = (tip) => {
+    console.log('Editing tip:', tip) // Debug logging
     setEditingTip(tip)
     setIsDialogOpen(true)
   }
@@ -114,14 +129,24 @@ export default function AdminTravelTipsTab() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="content">Content *</Label>
-                <Textarea
-                  id="content"
-                  name="content"
-                  rows={6}
-                  required
-                  defaultValue={editingTip?.content}
-                  placeholder="Travel tip content..."
-                />
+                <div className="w-full max-w-full overflow-hidden">
+                  <RichTextEditor
+                    key={editingTip?.id || 'new'} // Force re-render when editing different tip
+                    value={editingTip ? editingTip.content : newTipContent}
+                    onChange={(value) => {
+                      if (editingTip) {
+                        setEditingTip({ ...editingTip, content: value })
+                      } else {
+                        setNewTipContent(value)
+                      }
+                    }}
+                    placeholder="Travel tip content..."
+                  />
+                  {/* Debug: Show what we're passing to editor */}
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Debug: Content length = {(editingTip ? editingTip.content : newTipContent)?.length || 0}
+                  </div>
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <Button
@@ -130,6 +155,7 @@ export default function AdminTravelTipsTab() {
                   onClick={() => {
                     setIsDialogOpen(false)
                     setEditingTip(null)
+                    setNewTipContent('') // Reset new tip content
                   }}
                 >
                   Cancel
@@ -155,7 +181,10 @@ export default function AdminTravelTipsTab() {
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg mb-2">{tip.title}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-3">{tip.content}</p>
+                    <div 
+                      className="text-sm text-muted-foreground line-clamp-3 prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: tip.content }}
+                    />
                     {tip.created_at && (
                       <p className="text-xs text-muted-foreground mt-2">
                         Created:{" "}

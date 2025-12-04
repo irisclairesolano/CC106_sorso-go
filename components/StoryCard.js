@@ -13,10 +13,13 @@ import Link from "next/link"
 export default function StoryCard({ story }) {
   const formatDate = (dateString) => {
     if (!dateString) return "Recently"
-    return new Date(dateString).toLocaleDateString("en-US", {
+    const date = new Date(dateString)
+    // Use consistent formatting that works the same on server and client
+    return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
+      timeZone: "UTC"
     })
   }
 
