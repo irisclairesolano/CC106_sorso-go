@@ -401,16 +401,17 @@ export default function AdminDestinationsTab() {
                     <div className="flex items-center justify-between">
                       <div>
                         <label className="text-sm font-medium">Gallery Images</label>
-                        <p className="text-xs text-muted-foreground">Use the media library to add or remove gallery images.</p>
+                        <p className="text-xs text-muted-foreground">
+                          Use the media library to add or remove gallery images.
+                        </p>
                       </div>
                       <Button type="button" variant="outline" size="sm" onClick={openGalleryLibrary}>
                         <Plus className="mr-2 h-4 w-4" />
                         Add Images
                       </Button>
                     </div>
-                  </div>
 
-                  {galleryImages.length > 0 ? (
+                    {galleryImages.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                         {galleryImages.map((image, index) => (
                           <div key={image.id || `${image.url}-${index}`} className="relative group">
