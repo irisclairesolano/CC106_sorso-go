@@ -1,23 +1,12 @@
 export const revalidate = 30; // Revalidate every 30 seconds for faster updates
 
-import { getAboutInfo, getSustainableEntries } from "@/app/actions/general-actions";
+import { getAboutInfo } from "@/app/actions/general-actions";
 import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
 
 export default async function AboutPage() {
   const aboutInfo = await getAboutInfo()
-  const sustainableEntries = await getSustainableEntries()
   
-  const cultureSections = sustainableEntries?.length > 0
-    ? sustainableEntries.map(entry => ({ title: entry.s_title, description: entry.s_description }))
-    : aboutInfo?.culture_sections?.length > 0
-      ? aboutInfo.culture_sections
-      : [
-          { title: "Eco-Friendly Practices", description: "Use reusable water bottles..." },
-          { title: "Marine Conservation", description: "Keep a respectful distance from marine life..." },
-          { title: "Support Local Communities", description: "Shop local and hire community guides." },
-          { title: "Climate Awareness", description: "Use low-impact transport and respect weather patterns." },
-        ]
   const galleryImages = aboutInfo?.gallery_images || []
 
   return (
@@ -74,26 +63,6 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      {/* Sustainable Travel Section */}
-      <section className="bg-secondary/30 rounded-3xl p-8 md:p-12">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl md:text-4xl font-bold text-primary mb-4">Sustainable Travel</h2>
-            <p className="text-lg text-muted-foreground">
-              Travel responsibly and help preserve Sorsogon's natural beauty for future generations.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {cultureSections.map((section, index) => (
-              <Card key={`culture-${index}`} className="border-none bg-background/50">
-                <CardContent className="p-6 space-y-2">
-                  <h3 className="font-semibold text-lg">{section.title}</h3>
-                  <p className="text-sm text-muted-foreground">{section.description}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
       {galleryImages.length > 0 && (
         <section>
           <h2 className="text-3xl font-bold text-primary mb-6 text-center">Photo Highlights</h2>
@@ -107,37 +76,46 @@ export default async function AboutPage() {
         </section>
       )}
 
-          <div className="bg-primary/5 rounded-xl p-6 border border-primary/20">
-            <h3 className="font-semibold text-lg mb-3 text-primary">Our Commitment to SDGs</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+      {/* SDG Alignment Section */}
+      <section className="py-12 bg-secondary/30 rounded-3xl px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl md:text-4xl font-bold text-primary mb-4">
+              Our Commitment to SDGs
+            </h2>
+            <p className="text-lg text-muted-foreground leading-relaxed">
               Sorso-Go aligns with the United Nations Sustainable Development Goals:
             </p>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-start gap-2">
-                <span className="text-primary">•</span>
-                <span>
-                  <strong>SDG 8:</strong> Promoting sustainable tourism that creates jobs and supports local economic growth
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-primary">•</span>
-                <span>
-                  <strong>SDG 11:</strong> Making cities and communities sustainable through responsible tourism practices
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-primary">•</span>
-                <span>
-                  <strong>SDG 12:</strong> Ensuring responsible consumption and production in tourism activities
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-primary">•</span>
-                <span>
-                  <strong>SDG 13:</strong> Taking climate action by promoting low-impact travel and environmental awareness
-                </span>
-              </li>
-            </ul>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-start gap-4">
+              <span className="text-primary text-xl font-bold mt-1">•</span>
+              <div>
+                <p className="font-semibold text-foreground mb-1">SDG 8: Promoting sustainable tourism that creates jobs and supports local economic growth</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <span className="text-primary text-xl font-bold mt-1">•</span>
+              <div>
+                <p className="font-semibold text-foreground mb-1">SDG 11: Making cities and communities sustainable through responsible tourism practices</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <span className="text-primary text-xl font-bold mt-1">•</span>
+              <div>
+                <p className="font-semibold text-foreground mb-1">SDG 12: Ensuring responsible consumption and production in tourism activities</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <span className="text-primary text-xl font-bold mt-1">•</span>
+              <div>
+                <p className="font-semibold text-foreground mb-1">SDG 13: Taking climate action by promoting low-impact travel and environmental awareness</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
