@@ -9,7 +9,7 @@ export const FEATURE_CARD_IMAGE_CLASSES = "relative h-60 w-full overflow-hidden"
 export const FEATURE_CARD_CONTENT_CLASSES = "absolute bottom-0 left-0 w-full p-6";
 export const FEATURE_CARD_BODY_CLASSES = "p-6 flex-grow flex flex-col";
 
-export default function DestinationCard({ destination }) {
+export default function DestinationCard({ destination, priority = false }) {
   return (
     <Card className={FEATURE_CARD_BASE_CLASSES}>
       <div className={FEATURE_CARD_IMAGE_CLASSES}>
@@ -17,6 +17,8 @@ export default function DestinationCard({ destination }) {
           src={destination.cover_image_url || destination.image_url || `/placeholder.svg?height=400&width=600&query=sorsogon+${destination.name}`}
           alt={destination.name}
           fill
+          priority={priority}
+          loading={priority ? "eager" : "lazy"}
           placeholder="blur"
           blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZGRkIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
           className="object-cover transition-transform duration-700 group-hover:scale-110"

@@ -5,16 +5,25 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { getDestinations } from "@/app/actions/destination-actions"
 
 export default function DestinationsPage() {
-  const [destinations] = useState([
-    // Sample data - replace with actual data fetching
-    { id: 1, name: "Subic Beach", category: "Beach", address: "Matnog, Sorsogon" },
-    { id: 2, name: "Bulusan Volcano", category: "Mountain", address: "Bulusan, Sorsogon" },
-    { id: 3, name: "Paguriran Island", category: "Island", address: "Sorsogon City" }
-  ])
+  const [destinations, setDestinations] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [page, setPage] = useState(1)
+  const pageSize = 9
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      const data = await getDestinations(false)
+      setDestinations(data || [])
+      setLoading(false)
+    }
+    load()
+  }, [])
 
   const filteredDestinations = useMemo(() => {
     if (!searchQuery.trim()) return destinations
@@ -26,6 +35,10 @@ export default function DestinationsPage() {
       dest.address.toLowerCase().includes(query)
     )
   }, [destinations, searchQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredDestinations.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedDestinations = filteredDestinations.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
     <div className="container mx-auto py-12 min-h-screen">
@@ -76,8 +89,35 @@ export default function DestinationsPage() {
       </div>
 
       {/* DESTINATION LIST */}
-      <div className="mt-16">
-        <DestinationsList destinations={filteredDestinations} />
+      <div className="mt-16 space-y-8">
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(9)].map((_, i) => (
+              <div key={i} className="h-[260px] rounded-2xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <>
+            <DestinationsList destinations={pagedDestinations} />
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <Button variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
     </div>

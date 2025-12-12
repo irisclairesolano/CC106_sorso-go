@@ -13,11 +13,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -26,10 +26,10 @@ import { useToast } from "@/components/ui/use-toast"
 import { useClearSelectedItems, useError, useIsLoading, useSelectedItems, useSetLoading, useSetSelectedItems, useSyncSelectedItems, useToggleSelectedItem } from "@/lib/store/adminStore"
 import { yupResolver } from '@hookform/resolvers/yup'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Edit2, Eye, FileText, Image as ImageIcon, Loader2, Plus, Star, Trash2 } from "lucide-react"
+import { Check, Edit2, Eye, FileText, Image as ImageIcon, Loader2, Plus, Search, Star, Trash2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from 'react-hook-form'
 import * as yup from 'yup'
 
