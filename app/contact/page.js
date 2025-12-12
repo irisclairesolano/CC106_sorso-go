@@ -65,7 +65,7 @@ export default function ContactPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            {/* <Card>
               <CardHeader>
                 <CardTitle>Office Hours</CardTitle>
               </CardHeader>
@@ -85,7 +85,7 @@ export default function ContactPage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
           </div>
 
           {/* Contact Form */}
