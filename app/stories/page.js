@@ -6,16 +6,26 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PenSquare, Search } from "lucide-react"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { getStories } from "@/app/actions/story-actions"
 
 export default function StoriesPage() {
-  const [stories] = useState([
-    // Sample data - replace with actual data fetching
-    { id: 1, title: "My Amazing Subic Beach Adventure", author_name: "John Doe", content: "Had a great time at Subic Beach...", tags: ["beach", "adventure"] },
-    { id: 2, title: "Hiking Bulusan Volcano", author_name: "Jane Smith", content: "The trek was challenging but rewarding...", tags: ["mountain", "hiking"] },
-    { id: 3, title: "Island Paradise at Paguriran", author_name: "Mike Johnson", content: "Paguriran Island is a hidden gem...", tags: ["island", "nature"] }
-  ])
+  const [stories, setStories] = useState([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const pageSize = 9
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      const data = await getStories()
+      const approved = (data || []).filter((story) => story?.approved)
+      setStories(approved)
+      setLoading(false)
+    }
+    load()
+  }, [])
 
   const filteredStories = useMemo(() => {
     if (!searchQuery.trim()) return stories
@@ -28,6 +38,10 @@ export default function StoriesPage() {
       story.tags?.some(tag => tag.toLowerCase().includes(query))
     )
   }, [stories, searchQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredStories.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedStories = filteredStories.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
     <div className="container mx-auto py-12 min-h-screen">
@@ -81,9 +95,35 @@ export default function StoriesPage() {
         </div>
 
       </div>
-      <div className="mt-16">
-      {/* STORY LIST */}
-      <StoriesList stories={filteredStories} />
+      <div className="mt-16 space-y-8">
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[...Array(9)].map((_, i) => (
+              <div key={i} className="h-[320px] rounded-2xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <>
+            <StoriesList stories={pagedStories} />
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <Button variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
     

@@ -16,8 +16,8 @@ export default function NavigationWrapper() {
       try {
         const { isAdmin } = await import("@/app/actions/admin-actions")
         const adminLoggedIn = await isAdmin()
-        // Hide admin button if admin is logged in and not on admin pages
-        setShowAdminButton(!adminLoggedIn || isAdminPage)
+        // Hide admin button if admin is logged in or on admin pages
+        setShowAdminButton(!adminLoggedIn && !isAdminPage)
       } catch (error) {
         console.error("Error checking admin status:", error)
         setShowAdminButton(true)

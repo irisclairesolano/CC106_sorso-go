@@ -56,12 +56,31 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen">
-        <div className="animate-pulse">
-          <div className="h-96 bg-gray-200"></div>
+      <div className="flex flex-col min-h-screen space-y-12 p-6">
+        {/* Hero skeleton */}
+        <div className="h-80 rounded-3xl bg-muted animate-pulse" />
+
+        {/* Featured destinations skeleton */}
+        <div className="space-y-4">
+          <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-[300px] rounded-2xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        </div>
+
+        {/* Stories skeleton */}
+        <div className="space-y-4">
+          <div className="h-8 w-40 bg-muted rounded animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-[260px] rounded-2xl bg-muted animate-pulse" />
+            ))}
+          </div>
         </div>
       </div>
-    );
+    )
   }
 
   return (

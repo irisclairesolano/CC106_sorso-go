@@ -10,7 +10,7 @@ import { CalendarDays, User } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
-export default function StoryCard({ story }) {
+export default function StoryCard({ story, priority = false }) {
   const formatDate = (dateString) => {
     if (!dateString) return "Recently"
     const date = new Date(dateString)
@@ -33,6 +33,8 @@ export default function StoryCard({ story }) {
           src={story.image_url || "/placeholder.svg?height=400&width=600&query=travel+sorsogon"}
           alt={story.title}
           fill
+          priority={priority}
+          loading={priority ? "eager" : "lazy"}
           placeholder="blur"
           blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZGRkIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
           className="object-cover transition-transform duration-700 group-hover:scale-110"

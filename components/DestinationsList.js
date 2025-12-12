@@ -8,7 +8,11 @@ export default function DestinationsList({ destinations }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       {destinations.map((dest, index) => (
-        <DestinationCard key={dest.id || `destination-${index}`} destination={dest} />
+        <DestinationCard
+          key={dest.id || `destination-${index}`}
+          destination={dest}
+          priority={index < 3}
+        />
       ))}
     </div>
   )
