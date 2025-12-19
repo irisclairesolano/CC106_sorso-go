@@ -5,6 +5,7 @@ import { useActiveSection } from "@/hooks/useActiveSection"
 import { cn } from "@/lib/utils"
 import { MapPin, Menu, X } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 
@@ -95,7 +96,7 @@ export default function Navigation({ showAdminButton = true }) {
       <div className="relative z-50">
         <div className="w-full h-1 bg-palm-green/20">
           <div 
-            className="h-full bg-palm-green transition-all duration-200 ease-out"
+            className="h-full transition-all duration-200 ease-out bg-palm-green"
             style={{ 
               width: `${scrollProgress}%`,
               minWidth: '1px' // Ensure it's always visible
@@ -104,14 +105,23 @@ export default function Navigation({ showAdminButton = true }) {
           />
         </div>
       </div>
-      <div className="container mx-auto flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 font-heading font-bold text-xl text-palm-green hover:text-palm-green/90 transition-colors">
-          <MapPin className="h-6 w-6" />
-          <span>SORSO-GO</span>
+      <div className="container flex items-center justify-between h-16 mx-auto">
+        <Link
+          href="/"
+          className="flex items-center gap-2 transition-colors font-heading hover:opacity-90"
+        >
+          <Image
+            src="/logo.png"
+            alt="SORSO-GO Logo"
+            width={200}
+            height={200}
+            className="object-contain"
+            priority
+          />
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="items-center hidden gap-6 md:flex">
           {routes.map((route) => (
             <Link
               key={route.href}
@@ -130,7 +140,7 @@ export default function Navigation({ showAdminButton = true }) {
               <span className="relative">
                 {route.label}
                 {isActive(route) && (
-                  <span className="ml-2 inline-block h-1 w-4 rounded-full bg-palm-green" />
+                  <span className="inline-block w-4 h-1 ml-2 rounded-full bg-palm-green" />
                 )}
               </span>
             </Link>
@@ -147,8 +157,8 @@ export default function Navigation({ showAdminButton = true }) {
         </nav>
 
         {/* Mobile Nav Toggle */}
-        <button className="md:hidden p-2" onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        <button className="p-2 md:hidden" onClick={() => setIsOpen(!isOpen)}>
+          {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
 
@@ -176,7 +186,7 @@ export default function Navigation({ showAdminButton = true }) {
                 >
                   {route.label}
                   {isActive(route) && (
-                    <span className="ml-2 inline-block h-1 w-4 rounded-full bg-palm-green" />
+                    <span className="inline-block w-4 h-1 ml-2 rounded-full bg-palm-green" />
                   )}
                 </Link>
               </div>
